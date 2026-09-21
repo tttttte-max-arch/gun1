@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANGAR-07 · GAUSSIAN SPLATS</title>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+  "@sparkjsdev/spark":"https://sparkjs.dev/releases/spark/2.1.0/spark.module.js"
+}}
+</script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  canvas{display:block}
+  #gate{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+        background:#0a0a0b;color:#e8e8ea;text-align:center;padding:28px;transition:opacity .5s}
+  #gate.hide{opacity:0;pointer-events:none}
+  #gate .in{max-width:560px}
+  #gate h1{margin:0 0 6px;font-size:22px;font-weight:600;letter-spacing:.04em}
+  #gate .sub{font-size:13px;color:#8b8d93;margin:0 0 26px;letter-spacing:.14em;text-transform:uppercase}
+  #gate .keys{display:grid;grid-template-columns:repeat(2,1fr);gap:7px 20px;
+              margin:24px auto 26px;max-width:420px;text-align:left;font-size:13px;color:#a6a8ae}
+  #gate .keys b{display:inline-block;min-width:88px;color:#e8e8ea;
+                font:600 11.5px/1.7 ui-monospace,Menlo,Consolas,monospace}
+  #gate button{font:600 15px/1.2 inherit;color:#0b0b0c;background:#e8e8ea;border:0;border-radius:8px;
+               padding:15px 46px;cursor:pointer;letter-spacing:.03em}
+  #gate button:hover{background:#fff}
+  #gate .load{font-size:13px;color:#6f7177;letter-spacing:.1em}
+  #bar{width:280px;height:2px;background:#26272b;margin:16px auto 0;overflow:hidden}
+  #bar i{display:block;height:100%;width:0;background:#8b8d93;transition:width .25s}
+  .note{font-size:11.5px;color:#55575d;margin-top:22px;line-height:1.7}
+</style>
+</head>
+<body>
+<div id="gate"><div class="in">
+  <h1>ANGAR-07</h1>
+  <div class="sub">3D Gaussian Splatting</div>
+  <div id="g_load">
+    <p class="load" id="g_msg">Запекание освещения…</p>
+    <div id="bar"><i></i></div>
+  </div>
+  <div id="g_ready" style="display:none">
+    <div class="keys">
+      <div><b>W A S D</b>полёт</div>
+      <div><b>мышь</b>обзор</div>
+      <div><b>Space</b>вверх</div>
+      <div><b>Ctrl</b>вниз</div>
+      <div><b>Shift</b>быстрее</div>
+      <div><b>Alt</b>медленнее</div>
+      <div><b>G</b>ходьба / полёт</div>
+      <div><b>V</b>noclip</div>
+      <div><b>F3</b>счётчик</div>
+      <div><b>Esc</b>освободить мышь</div>
+    </div>
+    <button id="g_go">Войти</button>
+    <div class="note" id="g_stat"></div>
+  </div>
+</div></div>
+<div id="fps" style="position:fixed;left:8px;top:8px;z-index:40;display:none;color:#9aa;
+     font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;text-shadow:0 0 3px #000"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import {SparkRenderer, SplatMesh} from '@sparkjsdev/spark';
+
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp = (a,b,t)=> a+(b-a)*t;
+const sat = v => v<0?0:(v>1?1:v);
+
+/* ============================================================================
+   КАЧЕСТВО
+   Шаг сетки сэмплирования в метрах. Радиус сплата привязан к шагу, поэтому
+   уменьшение шага повышает плотность и детализацию, а не только их количество.
+============================================================================ */
+const QP = new URLSearchParams(location.search);
+const QNAME = QP.get('q') || 'high';
+const QS = {
+  low:  {wall:0.150, floor:0.230, roof:0.270, fine:0.100, shadow:0.150, aoCell:0.62},
+  med:  {wall:0.095, floor:0.150, roof:0.185, fine:0.066, shadow:0.115, aoCell:0.52},
+  high: {wall:0.062, floor:0.104, roof:0.135, fine:0.045, shadow:0.090, aoCell:0.45},
+  ultra:{wall:0.046, floor:0.078, roof:0.100, fine:0.034, shadow:0.070, aoCell:0.40}
+}[QNAME] || null;
+const Q = QS || {wall:0.062, floor:0.104, roof:0.135, fine:0.045, shadow:0.090, aoCell:0.45};
+
+/* ============================================================================
+   ГЕНЕРАТОР И ШУМ
+============================================================================ */
+let SEED = 20260921;
+const rnd = ()=>{ SEED = (SEED*1664525 + 1013904223) >>> 0; return SEED/4294967296; };
+const rr = (a,b)=> a + rnd()*(b-a);
+const ri = (a,b)=> Math.floor(rr(a,b+1));
+const pick = arr => arr[Math.floor(rnd()*arr.length)];
+
+function hash3(i,j,k){
+  let n = (Math.imul(i,374761393) + Math.imul(j,668265263) + Math.imul(k,1442695040)) >>> 0;
+  n = (n ^ (n>>>13)) >>> 0;
+  n = Math.imul(n, 1274126177) >>> 0;
+  return ((n ^ (n>>>16)) >>> 0) / 4294967296;
+}
+function vnoise(x,y,z){
+  const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z);
+  const xf=x-xi, yf=y-yi, zf=z-zi;
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf), w=zf*zf*(3-2*zf);
+  let r=0;
+  for(let dz=0;dz<2;dz++) for(let dy=0;dy<2;dy++) for(let dx=0;dx<2;dx++){
+    r += (dx?u:1-u)*(dy?v:1-v)*(dz?w:1-w) * hash3(xi+dx, yi+dy, zi+dz);
+  }
+  return r;
+}
+function fbm(x,y,z,oct){
+  let a=0.5, s=0, f=1;
+  for(let i=0;i<(oct||3);i++){ s += a*vnoise(x*f,y*f,z*f); f*=2.07; a*=0.5; }
+  return s*1.4;
+}
+
+/* ============================================================================
+   МИНИ-ШРИФТ 5x7 — разметка помещений и надписи на стенах
+============================================================================ */
+const FONT = {
+  A:[0x0E,0x11,0x11,0x1F,0x11,0x11,0x11], B:[0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E],
+  C:[0x0E,0x11,0x10,0x10,0x10,0x11,0x0E], D:[0x1E,0x11,0x11,0x11,0x11,0x11,0x1E],
+  E:[0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F], I:[0x0E,0x04,0x04,0x04,0x04,0x04,0x0E],
+  O:[0x0E,0x11,0x11,0x11,0x11,0x11,0x0E], R:[0x1E,0x11,0x11,0x1E,0x14,0x12,0x11],
+  S:[0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E], T:[0x1F,0x04,0x04,0x04,0x04,0x04,0x04],
+  X:[0x11,0x11,0x0A,0x04,0x0A,0x11,0x11], Y:[0x11,0x11,0x0A,0x04,0x04,0x04,0x04],
+  '1':[0x04,0x0C,0x04,0x04,0x04,0x04,0x0E], '2':[0x0E,0x11,0x01,0x06,0x08,0x10,0x1F],
+  '3':[0x1F,0x02,0x04,0x02,0x01,0x11,0x0E], '4':[0x02,0x06,0x0A,0x12,0x1F,0x02,0x02]
+};
+/** Попадает ли точка (a,b) в глиф строки. Координаты в метрах, b — вверх. */
+function textHit(str, a, b, ox, oy, cw, ch){
+  const gw = cw*1.32;
+  let i = Math.floor((a-ox)/gw);
+  if(i<0 || i>=str.length) return false;
+  const g = FONT[str[i]];
+  if(!g) return false;
+  const lx = (a-ox) - i*gw;
+  if(lx<0 || lx>cw) return false;
+  const ly = b-oy;
+  if(ly<0 || ly>ch) return false;
+  const px = Math.min(4, Math.floor(lx/cw*5));
+  const py = Math.min(6, Math.floor((1-ly/ch)*7));
+  return (g[py] >> (4-px)) & 1 ? true : false;
+}
+
+/* ============================================================================
+   ОПИСАНИЕ СЦЕНЫ
+   Сцена сначала собирается как список четырёхугольников, и только потом
+   превращается в сплаты. Такой порядок нужен, чтобы до рисования построить
+   карту теней и сетку затенения по той же самой геометрии.
+============================================================================ */
+const QUADS = [];      // {o,u,v,d,mat,opt}
+const COLLIDERS = [];
+const FIXTURES = [];   // светильники: {x,y,z,w,l}
+
+const _v = new THREE.Vector3();
+
+/** Четырёхугольник: точка o и два краевых вектора u, v. */
+function quad(ox,oy,oz, ux,uy,uz, vx,vy,vz, mat, opt){
+  QUADS.push({
+    o:new THREE.Vector3(ox,oy,oz),
+    u:new THREE.Vector3(ux,uy,uz),
+    v:new THREE.Vector3(vx,vy,vz),
+    mat, opt: opt||{}
+  });
+}
+
+/** Коробка шестью гранями. rotY поворачивает вокруг вертикали. */
+function box(cx,cy,cz, sx,sy,sz, mat, opt){
+  opt = opt || {};
+  const ry = opt.rotY || 0, c = Math.cos(ry), s = Math.sin(ry);
+  const ex = new THREE.Vector3(c,0,-s), ez = new THREE.Vector3(s,0,c);
+  const ey = new THREE.Vector3(0,1,0);
+  const hx=sx/2, hy=sy/2, hz=sz/2;
+  const C = new THREE.Vector3(cx,cy,cz);
+  const corner = (a,b,d)=> new THREE.Vector3().copy(C)
+    .addScaledVector(ex, a*hx).addScaledVector(ey, b*hy).addScaledVector(ez, d*hz);
+  const face = (o, U, V, id)=>{
+    if(opt.skipFaces && opt.skipFaces.indexOf(id)>=0) return;
+    quad(o.x,o.y,o.z, U.x,U.y,U.z, V.x,V.y,V.z, mat, opt);
+  };
+  const U = (k)=> new THREE.Vector3().copy(ex).multiplyScalar(k);
+  const V = (k)=> new THREE.Vector3().copy(ey).multiplyScalar(k);
+  const W = (k)=> new THREE.Vector3().copy(ez).multiplyScalar(k);
+  face(corner(-1,-1, 1), U(sx), V(sy), 'z+');
+  face(corner( 1,-1,-1), U(-sx), V(sy), 'z-');
+  face(corner( 1,-1, 1), W(-sz), V(sy), 'x+');
+  face(corner(-1,-1,-1), W(sz), V(sy), 'x-');
+  face(corner(-1, 1, 1), U(sx), W(-sz), 'y+');
+  face(corner(-1,-1,-1), U(sx), W(sz), 'y-');
+  if(opt.collide !== false) addCol(cx,cy,cz,sx,sy,sz,ry);
+}
+
+function addCol(cx,cy,cz,sx,sy,sz,ry){
+  const c=Math.abs(Math.cos(ry||0)), s=Math.abs(Math.sin(ry||0));
+  const ex=(sx*c+sz*s)/2, ez=(sx*s+sz*c)/2;
+  COLLIDERS.push({x0:cx-ex,y0:cy-sy/2,z0:cz-ez, x1:cx+ex,y1:cy+sy/2,z1:cz+ez});
+}
+
+/* ============================================================================
+   МАТЕРИАЛЫ — линейное альбедо поверхности
+   a, b — координаты внутри четырёхугольника в метрах; p — мировая точка.
+============================================================================ */
+const MATS = {
+  conc(p,a,b){
+    const n = fbm(p.x*0.33, p.y*0.33, p.z*0.33, 4);
+    let g = 0.34 + 0.20*n;
+    const jx = Math.abs(((p.x+3)%6+6)%6 - 3), jz = Math.abs(((p.z+3)%6+6)%6 - 3);
+    if(Math.min(jx,jz) < 0.045) g *= 0.52;
+    const st = fbm(p.x*0.085+11, 0.5, p.z*0.085+7, 3);
+    if(st > 0.60) g *= 1 - 0.36*(st-0.60)/0.4;
+    const dust = fbm(p.x*1.7, 0, p.z*1.7, 2);
+    g *= 0.92 + 0.16*dust;
+    return [g*1.02, g*1.0, g*0.955];
+  },
+  osb(p,a,b){
+    // Щепа вытянута поперёк листа, швы — по раскладке 1.22 x 2.44 м.
+    // Частоты подобраны так, чтобы щепа читалась как щепа, а не как кладка:
+    // крупная составляющая вытянута сильно, мелкая почти изотропна.
+    const strand = vnoise(a*3.1 + b*0.35, b*13.5, 3.1);
+    const fine   = fbm(a*17, b*17, 1.7, 2);
+    const flake  = vnoise(a*1.3, b*3.0, 8.4);
+    let k = 0.80 + 0.22*strand + 0.13*(fine-0.5) + 0.10*(flake-0.5);
+    const pa = ((a%1.22)+1.22)%1.22, pb = ((b%2.44)+2.44)%2.44;
+    if(pa < 0.016 || pb < 0.016) k *= 0.74;
+    k = clamp(k, 0.55, 1.20);
+    return [0.505*k, 0.385*k, 0.215*k];
+  },
+  ply(p,a,b){
+    const g = 0.70 + 0.30*fbm(a*4.0, b*4.0, 2.2, 3);
+    return [0.40*g, 0.30*g, 0.168*g];
+  },
+  painted(p,a,b){
+    const grime  = fbm(a*1.5, p.y*0.7, b*1.5, 4);
+    const streak = fbm(a*4.6, p.y*0.30, 0.7, 3);
+    let g = 0.66 - 0.30*Math.pow(grime,1.7) - 0.20*Math.max(0, streak-0.56);
+    const rust = fbm(a*0.8+3, p.y*0.5, b*0.8, 2);
+    g = Math.max(0.10, g);
+    const warm = 0.055*Math.max(0, rust-0.58);
+    return [g+warm*1.6, g*0.985+warm*0.7, g*0.93];
+  },
+  steel(p,a,b){
+    const n = fbm(p.x*2.4, p.y*2.4, p.z*2.4, 2);
+    const g = 0.030 + 0.030*n;
+    return [g*1.05, g, g*1.02];
+  },
+  roofUnder(p,a,b){
+    // Профлист: рёбра дают регулярную полосу светлее/темнее.
+    const rib = Math.abs(((a%0.21)+0.21)%0.21 - 0.105)/0.105;
+    const n = fbm(a*0.9, b*0.9, 4.4, 3);
+    let g = 0.055 + 0.042*n + 0.026*rib;
+    return [g*1.10, g*0.96, g*0.88];
+  },
+  corrugated(p,a,b){
+    const rib = Math.abs(((a%0.19)+0.19)%0.19 - 0.095)/0.095;
+    const n = fbm(a*0.7, p.y*0.7, b*0.7, 3);
+    let g = 0.24 + 0.16*n + 0.10*rib;
+    const dirt = Math.max(0, 1 - p.y/2.6);
+    g *= 1 - 0.34*dirt*fbm(a*1.3, p.y, b*1.3, 2);
+    return [g*1.0, g*0.99, g*0.96];
+  },
+  wood(p,a,b){
+    const grain = vnoise(a*1.4, b*16, 5.5);
+    const k = 0.72 + 0.42*grain;
+    return [0.32*k, 0.235*k, 0.135*k];
+  },
+  rubber(p,a,b){
+    const g = 0.022 + 0.016*fbm(a*9, b*9, 1.1, 2);
+    return [g,g,g*1.04];
+  },
+  drum(p,a,b){
+    const g = 0.12 + 0.10*fbm(a*6,b*6,2.2,2);
+    return [g*1.5, g*0.75, g*0.42];
+  },
+  white(p,a,b){
+    const g = 0.74 - 0.14*fbm(a*3,b*3,1,2);
+    return [g,g,g*0.98];
+  },
+  cloth(p,a,b){
+    const g = 0.20 + 0.10*fbm(a*8,b*8,3,2);
+    return [g*1.0, g*0.92, g*0.80];
+  }
+};
+
+/* ============================================================================
+   СОЛНЦЕ И КАРТА ТЕНЕЙ
+   Свет в ангар попадает только через световые полосы кровли и ленточное
+   остекление. Именно поэтому тень считается честно: без неё не будет
+   характерных светлых полос на полу, по которым и читается объём.
+============================================================================ */
+const SUN_DIR = new THREE.Vector3(-0.34, -0.86, 0.38).normalize(); // направление лучей
+const SUN_COL = [1.00, 0.955, 0.865];
+const SKY_COL = [0.560, 0.640, 0.760];
+const GND_COL = [0.430, 0.390, 0.330];
+
+let SM = null;
+function buildShadowMap(){
+  const L = SUN_DIR;
+  const up = Math.abs(L.y) > 0.9 ? new THREE.Vector3(1,0,0) : new THREE.Vector3(0,1,0);
+  const ex = new THREE.Vector3().crossVectors(up, L).normalize();
+  const ey = new THREE.Vector3().crossVectors(L, ex).normalize();
+
+  let u0=1e9,u1=-1e9, v0=1e9,v1=-1e9;
+  const P = new THREE.Vector3();
+  for(const q of QUADS){
+    if(q.opt.noShadow) continue;
+    for(let i=0;i<4;i++){
+      P.copy(q.o);
+      if(i&1) P.add(q.u);
+      if(i&2) P.add(q.v);
+      const a = P.dot(ex), b = P.dot(ey);
+      if(a<u0)u0=a; if(a>u1)u1=a; if(b<v0)v0=b; if(b>v1)v1=b;
+    }
+  }
+  u0-=1; u1+=1; v0-=1; v1+=1;
+  const texel = Q.shadow * 0.85;
+  const W = Math.min(2600, Math.ceil((u1-u0)/texel));
+  const H = Math.min(2600, Math.ceil((v1-v0)/texel));
+  const depth = new Float32Array(W*H).fill(1e9);
+
+  const step = Q.shadow;
+  for(const q of QUADS){
+    if(q.opt.noShadow) continue;
+    const lu = q.u.length(), lv = q.v.length();
+    const nu = Math.max(1, Math.ceil(lu/step)), nv = Math.max(1, Math.ceil(lv/step));
+    const skip = q.opt.skip;
+    for(let i=0;i<nu;i++){
+      const ta = (i+0.5)/nu;
+      for(let j=0;j<nv;j++){
+        const tb = (j+0.5)/nv;
+        if(skip && skip(ta*lu, tb*lv)) continue;
+        P.copy(q.o).addScaledVector(q.u, ta).addScaledVector(q.v, tb);
+        const a = (P.dot(ex)-u0)/(u1-u0)*W, b = (P.dot(ey)-v0)/(v1-v0)*H;
+        const d = P.dot(L);
+        const ix = Math.floor(a), iy = Math.floor(b);
+        for(let oy=-1;oy<=1;oy++){
+          const yy = iy+oy; if(yy<0||yy>=H) continue;
+          for(let ox=-1;ox<=1;ox++){
+            const xx = ix+ox; if(xx<0||xx>=W) continue;
+            const k = yy*W+xx;
+            if(d < depth[k]) depth[k] = d;
+          }
+        }
+      }
+    }
+  }
+  SM = {ex, ey, L, u0, u1, v0, v1, W, H, depth};
+}
+
+const _sp = new THREE.Vector3();
+/** Доля солнца в точке с нормалью n. PCF по четырём соседям. */
+function sunVis(px,py,pz, nx,ny,nz){
+  if(!SM) return 1;
+  _sp.set(px + nx*0.09, py + ny*0.09, pz + nz*0.09);
+  const a = (_sp.dot(SM.ex)-SM.u0)/(SM.u1-SM.u0)*SM.W;
+  const b = (_sp.dot(SM.ey)-SM.v0)/(SM.v1-SM.v0)*SM.H;
+  if(a<0||b<0||a>=SM.W||b>=SM.H) return 1;
+  const d = _sp.dot(SM.L);
+  const bias = 0.16;
+  let acc = 0;
+  for(let oy=0;oy<2;oy++) for(let ox=0;ox<2;ox++){
+    const xx = Math.min(SM.W-1, Math.floor(a)+ox), yy = Math.min(SM.H-1, Math.floor(b)+oy);
+    acc += (d <= SM.depth[yy*SM.W+xx] + bias) ? 1 : 0;
+  }
+  return acc/4;
+}
+
+/* ============================================================================
+   СЕТКА ЗАТЕНЕНИЯ
+   Грубая воксельная занятость: даёт контактную тень в углах и под настилом,
+   без неё сплаты выглядят плоско, как аппликация.
+============================================================================ */
+let AO = null;
+function buildAO(){
+  const cell = Q.aoCell;
+  let x0=1e9,y0=1e9,z0=1e9,x1=-1e9,y1=-1e9,z1=-1e9;
+  const P = new THREE.Vector3();
+  for(const q of QUADS){
+    for(let i=0;i<4;i++){
+      P.copy(q.o); if(i&1)P.add(q.u); if(i&2)P.add(q.v);
+      if(P.x<x0)x0=P.x; if(P.x>x1)x1=P.x;
+      if(P.y<y0)y0=P.y; if(P.y>y1)y1=P.y;
+      if(P.z<z0)z0=P.z; if(P.z>z1)z1=P.z;
+    }
+  }
+  x0-=cell;y0-=cell;z0-=cell;x1+=cell;y1+=cell;z1+=cell;
+  const nx = Math.ceil((x1-x0)/cell), ny = Math.ceil((y1-y0)/cell), nz = Math.ceil((z1-z0)/cell);
+  const g = new Uint8Array(nx*ny*nz);
+  const step = cell*0.7;
+  for(const q of QUADS){
+    const lu=q.u.length(), lv=q.v.length();
+    const nu=Math.max(1,Math.ceil(lu/step)), nv=Math.max(1,Math.ceil(lv/step));
+    const skip=q.opt.skip;
+    for(let i=0;i<nu;i++){
+      const ta=(i+0.5)/nu;
+      for(let j=0;j<nv;j++){
+        const tb=(j+0.5)/nv;
+        if(skip && skip(ta*lu, tb*lv)) continue;
+        P.copy(q.o).addScaledVector(q.u,ta).addScaledVector(q.v,tb);
+        const ix=Math.floor((P.x-x0)/cell), iy=Math.floor((P.y-y0)/cell), iz=Math.floor((P.z-z0)/cell);
+        if(ix<0||iy<0||iz<0||ix>=nx||iy>=ny||iz>=nz) continue;
+        g[(iz*ny+iy)*nx+ix] = 1;
+      }
+    }
+  }
+  AO = {g,nx,ny,nz,x0,y0,z0,cell};
+}
+const AO_DIRS = [
+  [ 0.00, 1.00, 0.00],[ 0.82, 0.50, 0.28],[-0.30, 0.50, 0.81],[-0.72, 0.50,-0.48],
+  [ 0.36, 0.50,-0.79],[ 0.62, 0.12, 0.77],[-0.86, 0.12, 0.49],[ 0.24, 0.12,-0.96]
+];
+const AO_RAYS = [
+  [ 0.00, 1.00, 0.00],[ 0.82, 0.50, 0.28],[-0.30, 0.50, 0.81],[-0.72, 0.50,-0.48],
+  [ 0.36, 0.50,-0.79],[ 0.62, 0.12, 0.77],[-0.86, 0.12, 0.49],[ 0.24, 0.12,-0.96],
+  [ 0.00,-1.00, 0.00],[ 0.70,-0.45, 0.55],[-0.70,-0.45,-0.55]
+];
+/** Поле открытости в узлах воксельной сетки. Скалярное поле сглаживается и
+    читается трилинейно — без этого затенение ложится кубиками по вокселям. */
+function buildOpenness(){
+  const {g,nx,ny,nz,x0,y0,z0,cell} = AO;
+  const op = new Float32Array(nx*ny*nz);
+  for(let iz=0;iz<nz;iz++) for(let iy=0;iy<ny;iy++) for(let ix=0;ix<nx;ix++){
+    const px = x0+(ix+0.5)*cell, py = y0+(iy+0.5)*cell, pz = z0+(iz+0.5)*cell;
+    let open = 0;
+    for(let k=0;k<AO_RAYS.length;k++){
+      const d = AO_RAYS[k];
+      let blocked = 0;
+      for(let s=1;s<=4;s++){
+        const t = s*cell*1.35;
+        const jx = Math.floor((px+d[0]*t-x0)/cell);
+        const jy = Math.floor((py+d[1]*t-y0)/cell);
+        const jz = Math.floor((pz+d[2]*t-z0)/cell);
+        if(jx<0||jy<0||jz<0||jx>=nx||jy>=ny||jz>=nz) break;
+        if(g[(jz*ny+jy)*nx+jx]){ blocked = 1/(1+(s-1)*0.7); break; }
+      }
+      open += 1-blocked;
+    }
+    op[(iz*ny+iy)*nx+ix] = open/AO_RAYS.length;
+  }
+  // одно сглаживание убирает ступеньки на границах вокселей
+  const sm = new Float32Array(op.length);
+  for(let iz=0;iz<nz;iz++) for(let iy=0;iy<ny;iy++) for(let ix=0;ix<nx;ix++){
+    let s=0, n=0;
+    for(let dz=-1;dz<=1;dz++) for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      const jx=ix+dx, jy=iy+dy, jz=iz+dz;
+      if(jx<0||jy<0||jz<0||jx>=nx||jy>=ny||jz>=nz) continue;
+      s += op[(jz*ny+jy)*nx+jx]; n++;
+    }
+    sm[(iz*ny+iy)*nx+ix] = s/n;
+  }
+  AO.op = sm;
+}
+function openAt(px,py,pz){
+  const {op,nx,ny,nz,x0,y0,z0,cell} = AO;
+  const fx = (px-x0)/cell-0.5, fy = (py-y0)/cell-0.5, fz = (pz-z0)/cell-0.5;
+  const ix = Math.floor(fx), iy = Math.floor(fy), iz = Math.floor(fz);
+  const tx = fx-ix, ty = fy-iy, tz = fz-iz;
+  let acc = 0;
+  for(let dz=0;dz<2;dz++) for(let dy=0;dy<2;dy++) for(let dx=0;dx<2;dx++){
+    const jx = clamp(ix+dx,0,nx-1), jy = clamp(iy+dy,0,ny-1), jz = clamp(iz+dz,0,nz-1);
+    const w = (dx?tx:1-tx)*(dy?ty:1-ty)*(dz?tz:1-tz);
+    acc += w*op[(jz*ny+jy)*nx+jx];
+  }
+  return acc;
+}
+function aoAt(px,py,pz, nx,ny,nz){
+  if(!AO || !AO.op) return 1;
+  // Сэмплируем поле чуть впереди поверхности, иначе точка лежит в занятом
+  // вокселе собственной стены и всё уходит в тень.
+  const o1 = openAt(px + nx*AO.cell*0.9, py + ny*AO.cell*0.9, pz + nz*AO.cell*0.9);
+  const o2 = openAt(px + nx*AO.cell*2.1, py + ny*AO.cell*2.1, pz + nz*AO.cell*2.1);
+  const o = o1*0.62 + o2*0.38;
+  return clamp(0.16 + 1.04*o, 0.16, 1);
+}
+
+/* ============================================================================
+   СВЕТИЛЬНИКИ
+============================================================================ */
+let FGRID = null;
+function buildFixtureGrid(){
+  const cell = 6;
+  const m = new Map();
+  FIXTURES.forEach((f,i)=>{
+    const ix = Math.floor(f.x/cell), iz = Math.floor(f.z/cell);
+    for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++){
+      const k = (ix+a)*7919 + (iz+b);
+      if(!m.has(k)) m.set(k,[]);
+      m.get(k).push(i);
+    }
+  });
+  FGRID = {m, cell};
+}
+function fixtureLight(px,py,pz, nx,ny,nz, out){
+  out[0]=out[1]=out[2]=0;
+  if(!FGRID) return;
+  const k = Math.floor(px/FGRID.cell)*7919 + Math.floor(pz/FGRID.cell);
+  const list = FGRID.m.get(k);
+  if(!list) return;
+  for(let i=0;i<list.length;i++){
+    const f = FIXTURES[list[i]];
+    const dx = f.x-px, dy = f.y-py, dz = f.z-pz;
+    const d2 = dx*dx+dy*dy+dz*dz;
+    if(d2 > 144) continue;
+    const d = Math.sqrt(d2);
+    let nd = (dx*nx + dy*ny + dz*nz)/d;
+    if(nd <= 0) continue;
+    // Светильник светит вниз: вклад гаснет для точек выше него.
+    const down = clamp((f.y-py)/1.2, 0, 1);
+    const att = f.p / (1 + d2*0.22);
+    const e = att*nd*down;
+    out[0]+=e*0.96; out[1]+=e*0.99; out[2]+=e*1.0;
+  }
+}
+
+/* ============================================================================
+   ЗАПЕКАНИЕ ЦВЕТА
+============================================================================ */
+const _fx = [0,0,0];
+const SUN_I = 2.9, SKY_I = 1.62, BNC_I = 0.72;
+function shade(px,py,pz, nx,ny,nz, alb, ao){
+  const vis = sunVis(px,py,pz, nx,ny,nz);
+  const nd  = Math.max(0, -(nx*SUN_DIR.x + ny*SUN_DIR.y + nz*SUN_DIR.z));
+  const sun = SUN_I * nd * vis;
+  // Небо и отражение от бетона: полусферические члены по вертикали нормали.
+  const skyF = SKY_I * (0.5 + 0.5*ny) * ao;
+  const gndF = BNC_I * (0.5 - 0.5*ny) * ao;
+  fixtureLight(px,py,pz, nx,ny,nz, _fx);
+  let r = alb[0]*(sun*SUN_COL[0] + skyF*SKY_COL[0] + gndF*GND_COL[0] + _fx[0]);
+  let g = alb[1]*(sun*SUN_COL[1] + skyF*SKY_COL[1] + gndF*GND_COL[1] + _fx[1]);
+  let b = alb[2]*(sun*SUN_COL[2] + skyF*SKY_COL[2] + gndF*GND_COL[2] + _fx[2]);
+  // Мягкое сжатие светов, иначе засветы у окон выжигаются в плоский белый.
+  r = r/(1+r*0.52); g = g/(1+g*0.52); b = b/(1+b*0.52);
+  r = Math.pow(sat(r*1.52), 1/2.2);
+  g = Math.pow(sat(g*1.52), 1/2.2);
+  b = Math.pow(sat(b*1.52), 1/2.2);
+  return [r,g,b];
+}
+
+/* ============================================================================
+   ЭМИССИЯ СПЛАТОВ
+   Каждый четырёхугольник превращается в решётку дисков. Диск плоский:
+   поперёк поверхности радиус мал, вдоль — порядка шага сетки, иначе между
+   сплатами остаются дыры, а на косом взгляде вылезает «ватность».
+============================================================================ */
+let SPLATS = null, NSPL = 0;
+const _c = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _col = new THREE.Color(), _m3 = new THREE.Matrix4();
+const _un = new THREE.Vector3(), _vn = new THREE.Vector3(), _nn = new THREE.Vector3();
+
+function emitQuad(q, dens){
+  const lu = q.u.length(), lv = q.v.length();
+  if(lu < 1e-4 || lv < 1e-4) return;
+  const step = dens || Q.wall;
+  const nu = Math.max(1, Math.round(lu/step));
+  const nv = Math.max(1, Math.round(lv/step));
+  const du = lu/nu, dv = lv/nv;
+
+  _un.copy(q.u).divideScalar(lu);
+  _vn.copy(q.v).divideScalar(lv);
+  _nn.copy(_un).cross(_vn).normalize();
+  _m3.makeBasis(_un, _vn, _nn);
+  _q.setFromRotationMatrix(_m3);
+
+  const o = q.opt;
+  const mat = MATS[q.mat] || MATS.conc;
+  const thin = o.thin || 0.030;
+  // Радиус чуть больше половины шага: поле смыкается без просветов, но и не
+  // расплывается. Меньшее значение давало решётку светлых точек на стенах.
+  // Диск вытянут по осям ячейки: на длинных узких полосах круглый сплат либо
+  // вылезает за край, либо оставляет щели.
+  const radU = du*0.60, radV = dv*0.60;
+  const jit = o.jitter === undefined ? 0.18 : o.jitter;
+  const twoSided = o.twoSided;
+  const skip = o.skip;
+  const tintF = o.tint;
+  const emis = o.emissive;
+
+  for(let i=0;i<nu;i++){
+    for(let j=0;j<nv;j++){
+      const a = (i+0.5)*du + (rnd()-0.5)*du*jit;
+      const b = (j+0.5)*dv + (rnd()-0.5)*dv*jit;
+      if(skip && skip(a,b)) continue;
+      _c.copy(q.o).addScaledVector(_un, a).addScaledVector(_vn, b);
+      // Микрорельеф: смещение вдоль нормали ломает идеальную плоскость.
+      const relief = o.relief === undefined ? 0.5 : o.relief;
+      const bump = (fbm(_c.x*7.3, _c.y*7.3, _c.z*7.3, 2) - 0.5) * thin * relief * 2.2;
+      _c.addScaledVector(_nn, bump);
+
+      let alb = mat(_c, a, b);
+      if(tintF){ const t = tintF(_c,a,b); if(!t) continue; alb = t; }
+      if(!emis && o.tags !== false){
+        const tg = q.mat==='conc' ? floorTagAt(_c) : tagAt(_c);
+        if(tg) alb = tg;
+      }
+
+      let rgb;
+      if(emis){
+        rgb = emis(_c,a,b);
+        if(!rgb) continue;
+      } else {
+        const ao = aoAt(_c.x,_c.y,_c.z, _nn.x,_nn.y,_nn.z);
+        rgb = shade(_c.x,_c.y,_c.z, _nn.x,_nn.y,_nn.z, alb, ao);
+        if(twoSided){
+          const ao2 = aoAt(_c.x,_c.y,_c.z, -_nn.x,-_nn.y,-_nn.z);
+          const back = shade(_c.x,_c.y,_c.z, -_nn.x,-_nn.y,-_nn.z, alb, ao2);
+          rgb = [(rgb[0]+back[0])*0.5, (rgb[1]+back[1])*0.5, (rgb[2]+back[2])*0.5];
+        }
+      }
+
+      const rj = 1 + (rnd()-0.5)*0.30;
+      _s.set(radU*rj, radV*rj, thin*(0.7+rnd()*0.6));
+      // Разброс яркости между соседними сплатами. Реконструкция из фотографий
+      // всегда даёт такой шум, без него поверхность выглядит нарисованной.
+      const nj = 1 + (rnd()-0.5)*(o.grain===undefined?0.13:o.grain);
+      _col.setRGB(sat(rgb[0]*nj), sat(rgb[1]*nj), sat(rgb[2]*nj));
+      SPLATS.pushSplat(_c, _s, _q, o.opacity===undefined?1.0:o.opacity, _col);
+      NSPL++;
+    }
+  }
+}
+
+/** Облако объёмных сплатов: пыль, стружка, мелкий мусор. */
+function emitCloud(n, fn){
+  for(let i=0;i<n;i++){
+    const r = fn(i);
+    if(!r) continue;
+    _c.set(r.x, r.y, r.z);
+    _s.set(r.rx, r.ry===undefined?r.rx:r.ry, r.rz===undefined?r.rx:r.rz);
+    if(r.rotY!==undefined){
+      _m3.makeRotationY(r.rotY); _q.setFromRotationMatrix(_m3);
+    } else _q.identity();
+    _col.setRGB(r.c[0], r.c[1], r.c[2]);
+    SPLATS.pushSplat(_c, _s, _q, r.a===undefined?1:r.a, _col);
+    NSPL++;
+  }
+}
+
+/** Облака, описанные до создания буфера, рисуются вместе с остальными. */
+const DEFERRED = [];
+const deferCloud = (n, fn)=> DEFERRED.push({n, fn});
+
+/* ============================================================================
+   РАЗМЕРЫ АНГАРА
+   Сняты с кадров бодикама: пролёт около 34 м, длина около 74 м, карниз ~7.2 м,
+   конёк ~10.4 м. Шаг колонн читается по кадрам как 7.4 м.
+============================================================================ */
+const HW = 17.0, HD = 37.0;
+const EAVE = 7.2, RIDGE = 10.4;
+const roofY = z => EAVE;              // скат идёт поперёк пролёта, вдоль X
+const roofYx = x => EAVE + (RIDGE-EAVE)*(1 - Math.abs(x)/HW);
+const COL_STEP = 7.4;
+const COL_Z = (()=>{ const o=[]; const n=Math.floor((HD-3)/COL_STEP);
+  for(let i=-n;i<=n;i++) o.push(i*COL_STEP); return o; })();
+const COL_X = [-HW+0.35, -5.7, 5.7, HW-0.35];
+
+// Световые полосы кровли: по три ленты на каждом скате — так снято на кадрах,
+// где потолок читается рядами светлых прямоугольников.
+const ROOF_LIGHT_X = [-14.6, -10.4, -5.4, 5.4, 10.4, 14.6];
+const RLIGHT_W = 1.22;
+function inRoofLight(x, z){
+  if(Math.abs(z) > HD-2.2) return false;
+  for(const cx of ROOF_LIGHT_X){
+    if(Math.abs(x-cx) < RLIGHT_W/2){
+      // Лента набрана панелями по 2.4 м с перемычками.
+      const t = ((z%2.55)+2.55)%2.55;
+      if(t > 0.20) return true;
+    }
+  }
+  return false;
+}
+
+// Ленточное остекление длинных стен
+const GL_Y0 = 5.05, GL_Y1 = 6.55;
+function inSideGlass(y, z){
+  if(y < GL_Y0 || y > GL_Y1) return false;
+  if(Math.abs(z) > HD-1.6) return false;
+  const t = ((z%3.7)+3.7)%3.7;
+  return t > 0.42 && t < 3.30;
+}
+
+/* ============================================================================
+   ОБОЛОЧКА
+============================================================================ */
+function buildShell(){
+  // --- пол ---
+  quad(-HW, 0, -HD,  HW*2,0,0,  0,0,HD*2, 'conc', {thin:0.026, relief:0.35, dens:Q.floor});
+  COLLIDERS.push({x0:-HW-2,y0:-2,z0:-HD-2,x1:HW+2,y1:0,z1:HD+2});
+
+  // --- длинные стены: бетон снизу, остекление, профлист сверху ---
+  for(const s of [-1,1]){
+    const x = s*HW;
+    // внутренняя поверхность стены
+    quad(x, 0, s>0?HD:-HD,  0,0,s>0?-HD*2:HD*2,  0,EAVE,0, 'painted', {
+      thin:0.035, dens:Q.wall,
+      skip:(a,b)=> inSideGlass(b, s>0?HD-a:-HD+a)
+    });
+    COLLIDERS.push({x0:s*HW-0.3, y0:0, z0:-HD, x1:s*HW+0.3, y1:EAVE, z1:HD});
+    // импосты остекления
+    for(let z=-HD+2; z<HD-2; z+=3.7){
+      box(x - s*0.06, (GL_Y0+GL_Y1)/2, z, 0.10, GL_Y1-GL_Y0, 0.09, 'steel', {collide:false, thin:0.03});
+    }
+    // Светящееся полотно в проёме остекления: снаружи пасмурное небо, оно
+    // на два порядка ярче интерьера, поэтому окна читаются как сплошной засвет.
+    quad(x - s*0.02, GL_Y0, s>0?HD:-HD,  0,0,s>0?-HD*2:HD*2,  0,GL_Y1-GL_Y0,0, 'white', {
+      collide:false, thin:0.022, dens:Q.wall*1.5, jitter:0.08, noShadow:true,
+      skip:(a,b)=> !inSideGlass(GL_Y0+b, s>0?HD-a:-HD+a),
+      emissive:()=>[1.0, 0.995, 0.975]
+    });
+  }
+
+  // --- торцевые стены ---
+  for(const s of [-1,1]){
+    const z = s*HD;
+    const n = 90;
+    for(let i=0;i<n;i++){
+      const x0 = -HW + i*(HW*2/n), x1 = x0 + HW*2/n;
+      const h = (roofYx(x0)+roofYx(x1))/2;
+      quad(x0, 0, z,  (x1-x0)*(s>0?-1:1),0,0,  0,h,0, 'corrugated', {thin:0.04, dens:Q.wall});
+    }
+    COLLIDERS.push({x0:-HW, y0:0, z0:s*HD-0.3, x1:HW, y1:RIDGE, z1:s*HD+0.3});
+    // ферма фронтона
+    gableTruss(z, s);
+  }
+
+  // --- кровля изнутри: два ската со светопрозрачными лентами ---
+  const seg = 54;
+  for(let side of [-1,1]){
+    for(let i=0;i<seg;i++){
+      const z0 = -HD + i*(HD*2/seg), z1 = z0 + HD*2/seg;
+      const xa = side<0 ? -HW : 0, xb = side<0 ? 0 : HW;
+      quad(xa, roofYx(xa), z0,  (xb-xa),roofYx(xb)-roofYx(xa),0,  0,0,(z1-z0),
+        'roofUnder', {
+          thin:0.05, dens:Q.roof, relief:0.8,
+          skip:(a,b)=>{
+            const t = a/Math.abs(xb-xa);
+            const x = xa + (xb-xa)*t, z = z0 + b;
+            return inRoofLight(x, z);
+          }
+        });
+      // светопрозрачная лента — источник световых полос на полу
+      quad(xa, roofYx(xa)-0.015, z0,  (xb-xa),roofYx(xb)-roofYx(xa),0,  0,0,(z1-z0),
+        'white', {
+          collide:false, thin:0.02, dens:Q.roof*0.9, jitter:0.08, noShadow:true,
+          skip:(a,b)=>{
+            const t = a/Math.abs(xb-xa);
+            return !inRoofLight(xa + (xb-xa)*t, z0 + b);
+          },
+          emissive:()=>[1.0, 0.99, 0.965]
+        });
+    }
+  }
+
+  // --- прогоны и колонны ---
+  for(const z of COL_Z){
+    for(const x of COL_X){
+      const top = roofYx(x) - 0.2;
+      box(x, top/2, z, 0.26, top, 0.26, 'steel', {thin:0.035});
+    }
+    roofTruss(z);
+  }
+  for(let z=-HD+2.6; z<HD; z+=2.6){
+    for(let side of [-1,1]){
+      const x0 = side<0?-HW:0, x1 = side<0?0:HW;
+      for(let k=1;k<=3;k++){
+        const t = k/4, x = x0+(x1-x0)*t;
+        box(x, roofYx(x)-0.30, z, 0.16, 0.15, 0.10, 'steel', {collide:false, thin:0.03});
+      }
+    }
+  }
+}
+
+/** Ферма поперёк пролёта: нижний пояс, верхний по скатам, стойки и раскосы. */
+function roofTruss(z){
+  const bot = EAVE - 0.35;
+  box(0, bot, z, HW*2-0.4, 0.15, 0.15, 'steel', {collide:false, thin:0.032});
+  for(let side of [-1,1]){
+    const n = 7;
+    for(let i=0;i<n;i++){
+      const t0=i/n, t1=(i+1)/n;
+      const x0 = side*HW*t0, x1 = side*HW*t1;
+      const y0 = roofYx(x0)-0.22, y1 = roofYx(x1)-0.22;
+      // верхний пояс по скату
+      const len = Math.hypot(x1-x0, y1-y0);
+      const ang = Math.atan2(y1-y0, x1-x0);
+      strut((x0+x1)/2, (y0+y1)/2, z, len, 0.13, ang);
+      // стойка и раскос
+      box(x1, (y1+bot)/2, z, 0.09, Math.max(0.05,y1-bot), 0.09, 'steel', {collide:false, thin:0.028});
+      const dx = x1-x0, dy = bot-y0;
+      strut((x0+x1)/2, (y0+bot)/2, z, Math.hypot(dx,dy), 0.075, Math.atan2(dy,dx));
+    }
+  }
+  COLLIDERS.push({x0:-HW,y0:bot-0.1,z0:z-0.12,x1:HW,y1:bot+0.12,z1:z+0.12});
+}
+function strut(cx,cy,cz,len,th,ang){
+  const c=Math.cos(ang), s=Math.sin(ang);
+  const ux=c*len, uy=s*len;
+  quad(cx-ux/2, cy-uy/2-th/2, cz-th/2,  ux,uy,0,  0,0,th, 'steel', {collide:false, thin:0.028, dens:Q.fine});
+  quad(cx-ux/2, cy-uy/2+th/2, cz-th/2,  ux,uy,0,  0,0,th, 'steel', {collide:false, thin:0.028, dens:Q.fine});
+  quad(cx-ux/2, cy-uy/2-th/2, cz+th/2,  ux,uy,0,  -s*th,c*th,0, 'steel', {collide:false, thin:0.028, dens:Q.fine});
+  quad(cx-ux/2, cy-uy/2-th/2, cz-th/2,  ux,uy,0,  -s*th,c*th,0, 'steel', {collide:false, thin:0.028, dens:Q.fine});
+}
+function gableTruss(z, s){
+  const zz = z - s*0.42;
+  const bot = EAVE - 0.35;
+  box(0, bot, zz, HW*2-0.5, 0.17, 0.17, 'steel', {collide:false, thin:0.032});
+  for(let side of [-1,1]){
+    const n = 8;
+    for(let i=0;i<n;i++){
+      const t0=i/n, t1=(i+1)/n;
+      const x0=side*HW*t0, x1=side*HW*t1;
+      const y0=roofYx(x0)-0.25, y1=roofYx(x1)-0.25;
+      strut((x0+x1)/2,(y0+y1)/2,zz, Math.hypot(x1-x0,y1-y0), 0.14, Math.atan2(y1-y0,x1-x0));
+      box(x1,(y1+bot)/2,zz, 0.10, Math.max(0.05,y1-bot), 0.10, 'steel', {collide:false, thin:0.028});
+      strut((x0+x1)/2,(y0+bot)/2,zz, Math.hypot(x1-x0,bot-y0), 0.08, Math.atan2(bot-y0,x1-x0));
+    }
+  }
+}
+
+/* ============================================================================
+   СВЕТИЛЬНИКИ КРОВЛИ
+   Ряды линейных ламп вдоль пролёта — их видно на каждом кадре.
+============================================================================ */
+function buildFixtures(){
+  const rows = [-12.6, -7.0, 0, 7.0, 12.6];
+  for(const x of rows){
+    for(let z=-HD+4; z<HD-3; z+=6.2){
+      const y = roofYx(x) - 0.62;
+      FIXTURES.push({x, y, z, p:0.52});
+      // корпус и светящаяся трубка
+      box(x, y+0.10, z, 0.16, 0.08, 1.52, 'steel', {collide:false, thin:0.028});
+      quad(x-0.075, y, z-0.76,  0.15,0,0,  0,0,1.52, 'white', {
+        collide:false, thin:0.02, dens:Q.fine, jitter:0.1,
+        emissive:()=>[1.0, 0.99, 0.95]
+      });
+    }
+  }
+}
+
+/* ============================================================================
+   ШУТ-ХАУС
+   Каркас из бруса, обшивка OSB. Часть стен зашита с двух сторон, часть
+   оставлена «на стойках» — так и снято на кадрах, и это важно для игры:
+   сквозь каркасную стену видно движение, но она не простреливается взглядом
+   целиком.
+============================================================================ */
+const F2 = 3.05;           // отметка второго этажа
+const DECK_T = 0.22;
+const WALL_H1 = 2.92, WALL_H2 = 2.62;
+const STUD = 0.045;
+
+const ROOMS = [];   // для размещения реквизита
+
+/** Стена каркасного дома от (x1,z1) до (x2,z2).
+    openings: [{at, w, y0, y1}] — проёмы по длине. */
+function frameWall(x1,z1,x2,z2, y0, h, opt){
+  opt = opt || {};
+  const len = Math.hypot(x2-x1, z2-z1);
+  if(len < 0.05) return;
+  const ux=(x2-x1)/len, uz=(z2-z1)/len;
+  const nx=uz, nz=-ux;
+  const th = opt.th || 0.13;
+  const ops = (opt.openings||[]).slice();
+  const clad = opt.clad === undefined ? 'both' : opt.clad;   // both|one|none
+  const mat = opt.mat || 'osb';
+
+  const isHole = (a,b)=>{
+    for(const o of ops){
+      if(a > o.at-o.w/2 && a < o.at+o.w/2 && b > (o.y0||0) && b < (o.y1===undefined?h:o.y1)) return true;
+    }
+    return false;
+  };
+
+  // стойки каркаса
+  const nstud = Math.max(2, Math.round(len/0.61));
+  for(let i=0;i<=nstud;i++){
+    const a = len*i/nstud;
+    if(isHole(a, h*0.5) && isHole(a, h*0.85)) continue;
+    let sy0 = y0, sh = h;
+    for(const o of ops){
+      if(a > o.at-o.w/2 && a < o.at+o.w/2){
+        if((o.y0||0) > 0.05){ sh = (o.y0); }
+        else if(o.y1 !== undefined && o.y1 < h){ sy0 = y0+o.y1; sh = h-o.y1; }
+        else sh = 0;
+      }
+    }
+    if(sh < 0.06) continue;
+    box(x1+ux*a, sy0+sh/2, z1+uz*a, STUD*2, sh, th*0.72,
+      'wood', {rotY:Math.atan2(nx,nz), collide:false, thin:0.026});
+  }
+  // обвязка
+  box((x1+x2)/2, y0+0.035, (z1+z2)/2, len, 0.07, th*0.78,
+    'wood', {rotY:Math.atan2(nx,nz), collide:false, thin:0.026});
+  box((x1+x2)/2, y0+h-0.045, (z1+z2)/2, len, 0.09, th*0.78,
+    'wood', {rotY:Math.atan2(nx,nz), collide:false, thin:0.026});
+
+  // обшивка
+  const sides = clad==='both' ? [1,-1] : clad==='one' ? [opt.side||1] : [];
+  for(const s of sides){
+    const ox = x1 + nx*s*th/2, oz = z1 + nz*s*th/2;
+    quad(ox, y0, oz,  ux*len*s, 0, uz*len*s,  0, h, 0, mat, {
+      thin:0.028, dens:Q.wall,
+      skip:(a,b)=> isHole(s>0?a:len-a, b),
+      tint: opt.tint
+    });
+  }
+  if(sides.length){
+    // Коллайдер ставим сегментами между проёмами, иначе игрок не пройдёт в дверь.
+    const cuts = [0];
+    for(const o of ops) if((o.y0||0) < 0.1){ cuts.push(o.at-o.w/2, o.at+o.w/2); }
+    cuts.push(len);
+    cuts.sort((a,b)=>a-b);
+    for(let i=0;i<cuts.length-1;i+=2){
+      const a0 = clamp(cuts[i],0,len), a1 = clamp(cuts[i+1],0,len);
+      if(a1-a0 < 0.08) continue;
+      const cx = x1+ux*(a0+a1)/2, cz = z1+uz*(a0+a1)/2;
+      addCol(cx, y0+h/2, cz, (a1-a0), h, th, Math.atan2(nx,nz));
+    }
+  }
+  WALLSEGS.push({x1,z1,x2,z2,y0,h,len,ux,uz,nx,nz,clad,ops});
+}
+const WALLSEGS = [];
+
+/** Настил второго этажа с вырезами под атриум и лестницы. */
+function deck(x0,z0,x1,z1, holes){
+  holes = holes || [];
+  const inHole = (x,z)=> holes.some(h=> x>h.x0 && x<h.x1 && z>h.z0 && z<h.z1);
+  quad(x0, F2, z0,  (x1-x0),0,0,  0,0,(z1-z0), 'osb', {
+    thin:0.03, dens:Q.floor, relief:0.4,
+    skip:(a,b)=> inHole(x0+a, z0+b)
+  });
+  // низ настила и балки
+  quad(x0, F2-DECK_T, z1,  (x1-x0),0,0,  0,0,-(z1-z0), 'wood', {
+    thin:0.03, dens:Q.floor*1.25,
+    skip:(a,b)=> inHole(x0+a, z1-b)
+  });
+  for(let x=x0+0.6; x<x1; x+=0.62){
+    const segs = [];
+    let cur = null;
+    for(let z=z0; z<z1; z+=0.3){
+      const solid = !inHole(x,z);
+      if(solid && !cur) cur = {a:z};
+      if((!solid || z+0.3>=z1) && cur){ cur.b = z; segs.push(cur); cur=null; }
+    }
+    for(const s of segs){
+      if(s.b-s.a < 0.3) continue;
+      box(x, F2-DECK_T+0.10, (s.a+s.b)/2, 0.075, 0.20, s.b-s.a,
+        'wood', {collide:false, thin:0.026});
+    }
+  }
+  // коллайдеры настила полосами, чтобы проёмы остались проходимыми
+  const N = 26;
+  for(let i=0;i<N;i++){
+    const ax = x0 + (x1-x0)*i/N, bx = x0 + (x1-x0)*(i+1)/N;
+    let run = null;
+    for(let j=0;j<=N;j++){
+      const z = z0 + (z1-z0)*j/N;
+      const solid = j<N && !inHole((ax+bx)/2, z+0.01);
+      if(solid && !run) run = z;
+      if(!solid && run !== null){
+        COLLIDERS.push({x0:ax, y0:F2-DECK_T, z0:run, x1:bx, y1:F2, z1:z});
+        run = null;
+      }
+    }
+  }
+}
+
+/** Марш лестницы. dir: '+x','-x','+z','-z' */
+function stairs(x0,z0, dir, y0,y1, width, run){
+  width = width||1.16; run = run||3.9;
+  const steps = Math.max(6, Math.round((y1-y0)/0.19));
+  const rise=(y1-y0)/steps, tread=run/steps;
+  const long = dir==='+x'||dir==='-x';
+  const sgn = (dir==='+x'||dir==='+z') ? 1 : -1;
+  for(let i=0;i<steps;i++){
+    const t = (i+0.5)*tread*sgn;
+    const cx = long ? x0+t : x0, cz = long ? z0 : z0+t;
+    const y = y0 + (i+1)*rise;
+    box(cx, y-rise/2, cz, long?tread:width, rise*0.34, long?width:tread,
+      'wood', {thin:0.026});
+    // подступенок
+    const bx = long ? x0+(i*tread)*sgn : x0, bz = long ? z0 : z0+(i*tread)*sgn;
+    box(bx, y-rise/2, bz, long?0.04:width, rise, long?width:0.04,
+      'wood', {collide:false, thin:0.024});
+  }
+  // косоуры
+  for(const s of [-1,1]){
+    const px = long ? x0+run/2*sgn : x0+s*width/2;
+    const pz = long ? z0+s*width/2 : z0+run/2*sgn;
+    const ang = Math.atan2(y1-y0, run);
+    const L = Math.hypot(run, y1-y0);
+    const c=Math.cos(ang)*sgn, sn=Math.sin(ang);
+    if(long){
+      quad(px-c*L/2, y0+(y1-y0)/2-sn*L/2-0.13, pz, c*L,sn*L,0, 0,0.26,0, 'wood',
+        {collide:false, thin:0.026, dens:Q.fine});
+    } else {
+      quad(px, y0+(y1-y0)/2-sn*L/2-0.13, pz-c*L/2, 0,sn*L,c*L, 0,0.26,0, 'wood',
+        {collide:false, thin:0.026, dens:Q.fine});
+    }
+  }
+  COLLIDERS.push({
+    x0: long ? Math.min(x0, x0+run*sgn) : x0-width/2,
+    z0: long ? z0-width/2 : Math.min(z0, z0+run*sgn),
+    x1: long ? Math.max(x0, x0+run*sgn) : x0+width/2,
+    z1: long ? z0+width/2 : Math.max(z0, z0+run*sgn),
+    y0: y0, y1: y0+0.02
+  });
+}
+
+/** Перила второго этажа. */
+function railing(x1,z1,x2,z2, y){
+  const len = Math.hypot(x2-x1, z2-z1);
+  if(len<0.2) return;
+  const ux=(x2-x1)/len, uz=(z2-z1)/len;
+  const ang = Math.atan2(uz,ux);
+  for(let t=0;t<=len;t+=1.35){
+    box(x1+ux*t, y+0.52, z1+uz*t, 0.075, 1.04, 0.075, 'wood', {collide:false, thin:0.024});
+  }
+  box((x1+x2)/2, y+1.03, (z1+z2)/2, len, 0.075, 0.075, 'wood',
+    {rotY:-ang, collide:false, thin:0.024});
+  box((x1+x2)/2, y+0.55, (z1+z2)/2, len, 0.06, 0.06, 'wood',
+    {rotY:-ang, collide:false, thin:0.024});
+  COLLIDERS.push({
+    x0:Math.min(x1,x2)-0.09, z0:Math.min(z1,z2)-0.09,
+    x1:Math.max(x1,x2)+0.09, z1:Math.max(z1,z2)+0.09, y0:y, y1:y+1.06
+  });
+}
+
+/* --- Планировка. Координаты сняты по кадрам: блок занимает центральную
+   часть пролёта и тянется вдоль ангара. --- */
+const BX0=-12.4, BX1=12.4, BZ0=-24.0, BZ1=26.0;
+const ATRIUM = {x0:-3.4, z0:-3.0, x1:3.4, z1:7.4};
+
+function buildShootHouse(){
+  const D  = (at,w)=>({at, w:w||0.94, y0:0, y1:2.08});
+  const Wn = (at,w)=>({at, w:w||1.05, y0:0.94, y1:1.88});
+  const Op = (at,w)=>({at, w:w||1.7,  y0:0,    y1:99});
+
+  /* ---------- первый этаж ---------- */
+  const H1 = WALL_H1;
+
+  // продольные несущие линии
+  frameWall(BX0, -18.0, BX0, 20.0, 0, H1, {openings:[D(6.2),D(19.0),Wn(12.0),D(30.0),Wn(34.0)]});
+  frameWall(BX1, -18.0, BX1, 20.0, 0, H1, {openings:[D(5.0),Wn(11.4),D(17.6),Wn(25.0),D(31.5)]});
+  frameWall(-7.0, -18.0, -7.0, 22.0, 0, H1,
+    {openings:[D(3.4),D(10.6),Wn(15.0),D(21.0),Wn(27.5),D(33.0),D(38.0)], clad:'one', side:1});
+  frameWall( 7.0, -18.0,  7.0, 22.0, 0, H1,
+    {openings:[D(4.6),Wn(9.0),D(14.2),D(22.8),Wn(29.0),D(35.5)], clad:'one', side:-1});
+
+  // поперечные перегородки — нарезка на комнаты
+  const cross = [-18.0,-14.2,-10.6,-7.0,-3.2,0.6,4.2,8.0,11.6,15.2,18.6,22.0];
+  for(let i=0;i<cross.length;i++){
+    const z = cross[i];
+    const ops = [D(3.0 + (i%3)*1.6), (i%2 ? Wn(8.4) : D(9.2))];
+    // атриум оставляем свободным
+    if(z > ATRIUM.z0-0.6 && z < ATRIUM.z1+0.6){
+      frameWall(BX0, z, ATRIUM.x0, z, 0, H1, {openings:[D(4.0)], clad: i%2?'both':'one'});
+      frameWall(ATRIUM.x1, z, BX1, z, 0, H1, {openings:[D(5.2)], clad: i%2?'both':'one'});
+    } else {
+      frameWall(BX0, z, BX1, z, 0, H1,
+        {openings:[D(3.0+(i%3)*1.2), Wn(12.0), D(18.0+(i%2)*1.4), Wn(22.6)],
+         clad: i===4 ? 'none' : 'both'});
+    }
+  }
+
+  // торцевые стены блока
+  frameWall(BX0,-18.0, BX1,-18.0, 0, H1, {openings:[D(6.0),Wn(12.4),D(19.0)]});
+  frameWall(BX0, 22.0, BX1, 22.0, 0, H1, {openings:[D(8.0),Wn(15.0),D(20.4)]});
+
+  /* ---------- настил и второй этаж ---------- */
+  const holes = [
+    ATRIUM,
+    {x0:-12.4, z0:-8.2, x1:-9.3, z1:-4.0},   // лестничный проём слева
+    {x0:  9.3, z0: 10.0, x1: 12.4, z1: 14.2},// лестничный проём справа
+    {x0: -5.6, z0: 16.4, x1: -1.0, z1: 20.6},// открытый двор второго этажа
+    {x0:  2.0, z0:-15.0, x1:  6.4, z1:-11.0}
+  ];
+  deck(BX0, -18.0, BX1, 22.0, holes);
+
+  // лестницы
+  stairs(-10.85, -7.6, '+z', 0, F2, 1.24, 4.0);
+  stairs( 10.85, 13.6, '-z', 0, F2, 1.24, 4.0);
+  stairs(  4.2, -14.2, '+z', 0, F2, 1.16, 3.8);
+
+  // перила по краям проёмов
+  const Y2 = F2;
+  railing(ATRIUM.x0, ATRIUM.z0, ATRIUM.x1, ATRIUM.z0, Y2);
+  railing(ATRIUM.x0, ATRIUM.z1, ATRIUM.x1, ATRIUM.z1, Y2);
+  railing(ATRIUM.x0, ATRIUM.z0, ATRIUM.x0, ATRIUM.z1, Y2);
+  railing(ATRIUM.x1, ATRIUM.z0, ATRIUM.x1, ATRIUM.z1, Y2);
+  railing(-9.3,-8.2,-9.3,-4.0, Y2);
+  railing(9.3,10.0,9.3,14.2, Y2);
+  railing(-5.6,16.4,-1.0,16.4, Y2);
+  railing(-5.6,20.6,-1.0,20.6, Y2);
+  railing(-5.6,16.4,-5.6,20.6, Y2);
+
+  /* ---------- второй этаж ---------- */
+  const H2 = WALL_H2;
+  const clip = (z)=> z>ATRIUM.z0-0.4 && z<ATRIUM.z1+0.4;
+
+  frameWall(BX0, -16.0, BX0, 20.0, F2, H2, {openings:[D(4.2),Wn(10.0),D(16.4),Wn(24.0),D(30.0)]});
+  frameWall(BX1, -16.0, BX1, 20.0, F2, H2, {openings:[Wn(6.0),D(12.2),Wn(18.6),D(26.0),Wn(32.0)]});
+  frameWall(-7.2, -16.0, -7.2, 20.0, F2, H2,
+    {openings:[D(5.0),Wn(11.2),D(18.0),D(25.4),Wn(31.0)], clad:'one', side:1});
+  frameWall( 7.2, -16.0,  7.2, 20.0, F2, H2,
+    {openings:[Wn(4.0),D(9.6),Wn(16.0),D(23.2),D(30.6)], clad:'one', side:-1});
+
+  const cross2 = [-16.0,-12.0,-8.4,-4.6,-1.0,9.0,12.6,16.0,19.6];
+  for(let i=0;i<cross2.length;i++){
+    const z = cross2[i];
+    if(clip(z)) continue;
+    frameWall(BX0, z, BX1, z, F2, H2,
+      {openings:[D(4.0+(i%2)*1.4), Wn(10.6), D(16.2), Wn(21.0)],
+       clad: i===2 ? 'none' : 'both'});
+  }
+  frameWall(BX0,-16.0, BX1,-16.0, F2, H2, {openings:[D(7.0),Wn(14.0)]});
+  frameWall(BX0, 20.0, BX1, 20.0, F2, H2, {openings:[D(9.0),Wn(17.0)]});
+
+  // прислонённые листы и обрезки — их много на всех кадрах
+  leanSheets();
+}
+
+function leanSheets(){
+  const spots = [
+    [-11.6,-12.0,0.28,0], [-4.0, 19.2,-0.30,1.2], [6.2,-9.4,0.26,0.4],
+    [11.0, 4.0,-0.24,1.9], [-8.0, 6.4,0.30,0.2], [2.6, 12.0,-0.27,2.6],
+    [-12.0, 2.0,0.25,1.5], [9.4,-16.0,-0.29,0.7], [0.4,-17.0,0.22,3.0]
+  ];
+  for(const [x,z,tilt,ry] of spots){
+    const w = rr(1.0,1.24), h = rr(2.0,2.44);
+    const c=Math.cos(ry), s=Math.sin(ry);
+    const nx=Math.cos(ry+Math.PI/2), nz=Math.sin(ry+Math.PI/2);
+    quad(x - c*w/2, 0.02, z - s*w/2,
+      c*w, 0, s*w,
+      nx*Math.sin(tilt)*h, Math.cos(tilt)*h, nz*Math.sin(tilt)*h,
+      'osb', {thin:0.028, dens:Q.wall, twoSided:true});
+    addCol(x, h/2*Math.cos(tilt), z, w, h*Math.cos(tilt), 0.4, ry);
+  }
+}
+
+/* ============================================================================
+   РЕКВИЗИТ
+============================================================================ */
+function tire(x,y,z){
+  const R=0.34, r=0.115;
+  const n = 22, m = 8;
+  for(let i=0;i<n;i++){
+    const a0=i/n*6.2832, a1=(i+1)/n*6.2832;
+    for(let j=0;j<m;j++){
+      const b0=j/m*6.2832, b1=(j+1)/m*6.2832;
+      const P=(a,b)=>[ x+(R+r*Math.cos(b))*Math.cos(a), y+r*Math.sin(b), z+(R+r*Math.cos(b))*Math.sin(a) ];
+      const p0=P(a0,b0), p1=P(a1,b0), p2=P(a0,b1);
+      quad(p0[0],p0[1],p0[2], p1[0]-p0[0],p1[1]-p0[1],p1[2]-p0[2],
+           p2[0]-p0[0],p2[1]-p0[1],p2[2]-p0[2], 'rubber',
+           {collide:false, thin:0.024, dens:Q.fine, jitter:0.5});
+    }
+  }
+  addCol(x,y,z, R*2, r*2, R*2, 0);
+}
+function tireStack(x,z,n,y0){
+  y0 = y0||0;
+  for(let i=0;i<n;i++) tire(x+rr(-0.03,0.03), y0+0.12+i*0.23, z+rr(-0.03,0.03));
+}
+function barrel(x,y,z,mat){
+  const R=0.29, H=0.88, n=18;
+  for(let i=0;i<n;i++){
+    const a0=i/n*6.2832, a1=(i+1)/n*6.2832;
+    const p0=[x+R*Math.cos(a0), y, z+R*Math.sin(a0)];
+    const p1=[x+R*Math.cos(a1), y, z+R*Math.sin(a1)];
+    quad(p0[0],p0[1],p0[2], p1[0]-p0[0],0,p1[2]-p0[2], 0,H,0, mat||'drum',
+      {collide:false, thin:0.026, dens:Q.fine});
+  }
+  quad(x-R, y+H, z-R, R*2,0,0, 0,0,R*2, mat||'drum', {collide:false, thin:0.024, dens:Q.fine});
+  addCol(x, y+H/2, z, R*2, H, R*2, 0);
+}
+function crate(x,y,z,s,ry){
+  box(x, y+s/2, z, s, s, s*0.82, 'ply', {rotY:ry||0, thin:0.028});
+}
+function pallet(x,y,z,ry){
+  for(let i=0;i<5;i++){
+    box(x, y+0.115, z-0.5+i*0.25, 1.15, 0.03, 0.12, 'wood', {rotY:ry||0, collide:false, thin:0.022});
+  }
+  for(const d of [-0.5,0,0.5]) box(x+d*1.0, y+0.055, z, 0.12, 0.11, 1.12, 'wood', {rotY:ry||0, collide:false, thin:0.022});
+  addCol(x,y+0.07,z, 1.2, 0.14, 1.1, ry||0);
+}
+function table(x,y,z,w,d,ry){
+  box(x, y+0.73, z, w, 0.045, d, 'ply', {rotY:ry||0, thin:0.024});
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    box(x+sx*(w/2-0.09), y+0.36, z+sz*(d/2-0.09), 0.06, 0.72, 0.06,
+      'steel', {rotY:ry||0, collide:false, thin:0.022});
+  }
+}
+function chair(x,y,z,ry){
+  box(x, y+0.44, z, 0.44, 0.04, 0.42, 'steel', {rotY:ry, collide:false, thin:0.022});
+  box(x - Math.sin(ry)*0.19, y+0.70, z - Math.cos(ry)*0.19, 0.42, 0.48, 0.04,
+    'steel', {rotY:ry, collide:false, thin:0.022});
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    box(x+sx*0.18, y+0.22, z+sz*0.17, 0.035, 0.44, 0.035, 'steel', {rotY:ry, collide:false, thin:0.02});
+  }
+  addCol(x,y+0.4,z, 0.5,0.8,0.5, ry);
+}
+function whiteboard(x,y,z,ry,w,h){
+  w=w||1.8; h=h||1.1;
+  const c=Math.cos(ry), s=Math.sin(ry);
+  quad(x-c*w/2, y, z-s*w/2, c*w,0,s*w, 0,h,0, 'white',
+    {thin:0.024, dens:Q.wall, tint:(p,a,b)=>{
+      // редкие следы маркера
+      const n = fbm(a*3.2, b*3.2, 7.7, 3);
+      if(n > 0.66) return [0.10,0.12,0.22];
+      const g = 0.80 - 0.10*fbm(a*6,b*6,2,2);
+      return [g,g,g*0.99];
+    }});
+  addCol(x,y+h/2,z, w,h,0.1, ry);
+}
+function target(x,y,z,ry){
+  const w=0.58,h=0.92;
+  const c=Math.cos(ry), s=Math.sin(ry);
+  quad(x-c*w/2, y, z-s*w/2, c*w,0,s*w, 0,h,0, 'white',
+    {thin:0.022, dens:Q.fine, tint:(p,a,b)=>{
+      const dx=(a-w/2)/0.26, dy=(b-h*0.62)/0.30;
+      const r=Math.hypot(dx,dy);
+      if(r<1.0){ const band=Math.floor(r*4)%2; return band? [0.72,0.70,0.66] : [0.10,0.10,0.11]; }
+      return [0.70,0.68,0.63];
+    }});
+}
+function cableCoil(x,y,z){
+  const R=0.42;
+  for(let k=0;k<3;k++){
+    const rk = R - k*0.075;
+    for(let i=0;i<34;i++){
+      const a=i/34*6.2832;
+      const px=x+rk*Math.cos(a), pz=z+rk*Math.sin(a);
+      const py = y+0.035+k*0.045;
+      deferCloud(1, ()=>{
+        const lit = shade(px,py,pz, 0,1,0, [0.055,0.085,0.17], aoAt(px,py,pz,0,1,0));
+        return {x:px, y:py, z:pz, rx:0.045, c:lit};
+      });
+    }
+  }
+}
+function mannequin(x,z,ry,col,onDeck){
+  const y = onDeck ? F2 : 0;
+  const c=[col[0],col[1],col[2]];
+  const dark=[c[0]*0.5,c[1]*0.5,c[2]*0.5];
+  box(x, y+0.46, z, 0.30, 0.86, 0.22, 'cloth', {rotY:ry, collide:false, thin:0.03, tint:()=>dark});
+  box(x, y+1.16, z, 0.42, 0.62, 0.26, 'cloth', {rotY:ry, collide:false, thin:0.03, tint:()=>c});
+  box(x, y+1.58, z, 0.20, 0.24, 0.20, 'cloth', {rotY:ry, collide:false, thin:0.028,
+    tint:()=>[0.44,0.34,0.28]});
+  for(const s of [-1,1]){
+    box(x+Math.cos(ry)*s*0.27, y+1.12, z-Math.sin(ry)*s*0.27, 0.13, 0.58, 0.14,
+      'cloth', {rotY:ry, collide:false, thin:0.028, tint:()=>c});
+  }
+  addCol(x,y+0.9,z, 0.5,1.8,0.4, ry);
+}
+
+function buildProps(){
+  // покрышки — самый заметный реквизит на кадрах
+  tireStack(3.1, 9.4, 5);
+  tireStack(-9.8, 14.6, 4);
+  tireStack(8.2, -6.0, 3);
+  tireStack(-2.4, -13.2, 4, F2);
+  tireStack(10.4, 18.0, 3);
+  tire(-6.2, 0.18, 21.0); tire(1.4, 0.18, -20.2);
+  // покрышка в оконном проёме
+  tire(7.06, F2+1.35, 16.0);
+
+  // бочки
+  barrel(-14.6, 0, 8.0); barrel(-14.6, 0, 8.9);
+  barrel(14.2, 0, -12.0); barrel(13.4, 0, -12.4, 'steel');
+  barrel(-15.2, 0, -20.0); barrel(15.0, 0, 24.0);
+  barrel(5.6, 0, 24.6, 'steel');
+
+  // ящики и поддоны
+  crate(-10.0, 0, 3.4, 0.86, 0.3); crate(-10.2, 0.86, 3.5, 0.72, 0.9);
+  crate(9.0, 0, -2.0, 0.92, 1.8); crate(4.4, 0, 18.0, 0.80, 0.4);
+  crate(-4.0, F2, -9.0, 0.76, 2.1); crate(11.2, 0, 8.6, 0.9, 0.0);
+  pallet(-13.0, 0, 16.0, 0.4); pallet(-13.0, 0.14, 16.1, 0.5);
+  pallet(12.6, 0, -18.0, 1.2); pallet(2.0, 0, 22.4, 0.1);
+
+  // «переговорная» на первом этаже: стол, стулья, доска
+  table(-3.0, 0, 12.2, 2.4, 1.0, 0.06);
+  for(let i=0;i<4;i++) chair(-4.0+i*0.7, 0, 11.3, 0.1+i*0.05);
+  chair(-2.4, 0, 13.2, 3.2); chair(-1.6, 0, 13.0, 3.4);
+  whiteboard(-6.85, 1.05, 12.0, Math.PI/2, 1.9, 1.15);
+  whiteboard(6.9, 1.1, -4.0, -Math.PI/2, 1.7, 1.05);
+
+  // стол на втором этаже
+  table(3.6, F2, -6.0, 1.9, 0.9, 1.6);
+  chair(3.0, F2, -5.0, 0.6); chair(4.4, F2, -6.9, 3.0);
+
+  // мишени
+  target(-6.9, 0.55, 5.0, Math.PI/2);
+  target(7.1, 0.60, 9.4, -Math.PI/2);
+  target(-3.2, F2+0.5, 18.4, 0.0);
+  target(12.3, 0.58, 1.0, -Math.PI/2);
+
+  // кабели
+  cableCoil(-8.4, 0, -2.0); cableCoil(5.0, 0, 15.6); cableCoil(-11.0, F2, 6.0);
+
+  // манекены — расставлены по кадрам
+  mannequin(-5.6, -1.2, 0.7, [0.19,0.21,0.14]);        // камуфляж
+  mannequin(4.8, 2.4, 2.4, [0.62,0.30,0.30]);          // розовый
+  mannequin(-9.2, 9.0, 1.1, [0.52,0.50,0.46]);
+  mannequin(9.6, 12.0, 4.0, [0.30,0.32,0.36]);
+  mannequin(-1.0, 16.2, 0.2, [0.55,0.52,0.44], true);
+  mannequin(6.0, -12.0, 3.6, [0.24,0.26,0.24], true);
+  mannequin(-11.0, 20.0, 2.0, [0.48,0.30,0.22]);
+
+  // стойки штанги / стеллаж у стены
+  for(let i=0;i<3;i++){
+    box(-16.2, 0.9+i*0.0, 26.0+i*1.1, 0.5, 1.8, 0.5, 'steel', {thin:0.03});
+  }
+}
+
+/* ============================================================================
+   ГРАФФИТИ И ЗАГРЯЗНЕНИЯ
+   Рисуются как подмена альбедо на уже существующих стенах, а не отдельными
+   плоскостями: сплаты и так лежат на поверхности, дублировать их незачем.
+============================================================================ */
+const TAGS = [];
+function addTag(x,z,ry, y0, str, size, col, kind){
+  TAGS.push({x,z,ry,y0,str,size,col,kind:kind||'text'});
+}
+function buildTags(){
+  addTag( 7.13, 6.6, -Math.PI/2, 1.30, 'SORRY', 0.62, [0.86,0.85,0.82]);
+  addTag(-7.13, -6.0, Math.PI/2, 1.24, 'EXIT',  0.34, [0.62,0.18,0.16]);
+  addTag(-12.53, 2.0, Math.PI/2, 1.40, 'B',     0.78, [0.55,0.14,0.12]);
+  addTag( 12.53, -9.0, -Math.PI/2, 1.35, 'A',   0.72, [0.50,0.16,0.14]);
+  addTag( 7.13, F2+1.2, -Math.PI/2, F2+1.2, 'C', 0.66, [0.44,0.20,0.48]);
+  addTag(-7.13, 17.0, Math.PI/2, 1.28, '1',     0.60, [0.20,0.30,0.55]);
+  addTag( 12.53, 14.0, -Math.PI/2, 1.30, '2',   0.60, [0.20,0.30,0.55]);
+  addTag(-12.53, -12.0, Math.PI/2, 1.30, '3',   0.60, [0.22,0.34,0.52]);
+}
+/** Проверка попадания точки в граффити. Возвращает цвет или null. */
+function tagAt(p){
+  for(const t of TAGS){
+    const dx = p.x - t.x, dz = p.z - t.z;
+    const c = Math.cos(t.ry), s = Math.sin(t.ry);
+    // локальная система: a — вдоль стены, n — поперёк
+    const n = dx*Math.sin(t.ry) + dz*Math.cos(t.ry);
+    if(Math.abs(n) > 0.22) continue;
+    const a = dx*Math.cos(t.ry) - dz*Math.sin(t.ry);
+    const b = p.y - t.y0;
+    if(a < -0.4 || a > t.str.length*t.size*1.4 || b < -0.1 || b > t.size*1.5) continue;
+    if(textHit(t.str, a, b, 0, 0, t.size, t.size*1.35)){
+      // краска ложится неровно, местами просвечивает основа
+      const w = fbm(p.x*9, p.y*9, p.z*9, 2);
+      if(w < 0.30) continue;
+      return [t.col[0]*(0.75+0.4*w), t.col[1]*(0.75+0.4*w), t.col[2]*(0.75+0.4*w)];
+    }
+  }
+  return null;
+}
+
+/** Теги на бетонном полу — размашистые росчерки. */
+const FLOOR_TAGS = [
+  {x:6.0, z:5.0, r:3.2, c:[0.24,0.16,0.42]},
+  {x:-3.0, z:-8.0, r:2.6, c:[0.16,0.20,0.44]},
+  {x:9.0, z:-14.0, r:2.2, c:[0.34,0.14,0.30]},
+  {x:-9.0, z:18.0, r:2.8, c:[0.20,0.18,0.40]},
+  {x:1.0, z:21.0, r:2.0, c:[0.30,0.20,0.16]},
+  {x:-12.0, z:-2.0, r:2.4, c:[0.18,0.22,0.40]}
+];
+function floorTagAt(p){
+  for(const t of FLOOR_TAGS){
+    const d = Math.hypot(p.x-t.x, p.z-t.z);
+    if(d > t.r) continue;
+    // росчерк: тонкие линии, заданные шумом
+    const s = fbm(p.x*1.6+t.x, 0.5, p.z*1.6+t.z, 3);
+    const line = Math.abs(s-0.5);
+    const fade = 1 - d/t.r;
+    if(line < 0.030*fade){
+      const k = 0.7+0.6*fbm(p.x*8,1,p.z*8,2);
+      return [t.c[0]*k, t.c[1]*k, t.c[2]*k];
+    }
+  }
+  return null;
+}
+
+/* ============================================================================
+   МУСОР И ПЫЛЬ
+============================================================================ */
+function buildDebris(){
+  // стружка и обрезки на обоих этажах
+  emitCloud(5200, ()=>{
+    const onDeck = rnd() < 0.34;
+    const x = rr(BX0-2.5, BX1+2.5), z = rr(BZ0-2, BZ1+2);
+    if(onDeck && (x<BX0||x>BX1||z<-18||z>22)) return null;
+    if(onDeck && x>ATRIUM.x0 && x<ATRIUM.x1 && z>ATRIUM.z0 && z<ATRIUM.z1) return null;
+    const y = (onDeck ? F2 : 0) + rr(0.006, 0.03);
+    const k = rr(0.55, 1.25);
+    const ao = onDeck ? 0.82 : 0.92;
+    const lit = shade(x,y,z, 0,1,0, [0.40*k,0.30*k,0.17*k], ao*aoAt(x,y,z,0,1,0));
+    return {x, y, z, rx: rr(0.022,0.075), ry: rr(0.006,0.016), rz: rr(0.016,0.05),
+            rotY: rr(0,6.28), c: lit};
+  });
+  // пыль в воздухе — ловит свет из кровельных лент
+  emitCloud(2600, ()=>{
+    const x = rr(-HW+1, HW-1), z = rr(-HD+2, HD-2);
+    const y = rr(0.6, EAVE-0.5);
+    const vis = sunVis(x,y,z, 0,1,0);
+    // Вне светового столба пылинка почти не видна, поэтому её не тратим.
+    if(vis < 0.55 && rnd() < 0.93) return null;
+    const g = 0.55 + 0.45*vis;
+    return {x,y,z, rx: rr(0.012,0.035),
+            c:[g*0.95, g*0.92, g*0.84], a: rr(0.10,0.30)};
+  });
+}
+
+/* ============================================================================
+   СБОРКА СЦЕНЫ
+============================================================================ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1013);
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.06, 260);
+const renderer = new THREE.WebGLRenderer({antialias:false, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const spark = new SparkRenderer({renderer, maxStdDev: Math.sqrt(6)});
+scene.add(spark);
+
+let splatMesh = null;
+
+function describeScene(){
+  buildShell();
+  buildFixtures();
+  buildShootHouse();
+  buildProps();
+  buildTags();
+}
+
+function emitAll(){
+  for(const q of QUADS) emitQuad(q, q.opt.dens);
+  for(const d of DEFERRED) emitCloud(d.n, d.fn);
+  buildDebris();
+}
+
+/* ============================================================================
+   ИГРОК
+============================================================================ */
+const PL = {
+  pos: new THREE.Vector3(-14.6, 1.66, -30.0),
+  vel: new THREE.Vector3(),
+  yaw: 0.28, pitch: -0.04,
+  fly: true, eye: 1.62, onGround:false, speed: 5.5, jl:false
+};
+const BODY = {walk:{r:0.34,h:1.76,off:0}, fly:{r:0.28,h:0.56,off:-0.28}};
+let NOCLIP = false, locked = false;
+const keys = Object.create(null);
+const SENS = 0.0016;
+
+const GRID = new Map(), CELL = 4;
+const gkey = (ix,iz)=> ix*10007 + iz;
+function buildGrid(){
+  GRID.clear();
+  COLLIDERS.forEach((c,i)=>{
+    for(let ix=Math.floor(c.x0/CELL); ix<=Math.floor(c.x1/CELL); ix++)
+      for(let iz=Math.floor(c.z0/CELL); iz<=Math.floor(c.z1/CELL); iz++){
+        const k=gkey(ix,iz); if(!GRID.has(k)) GRID.set(k,[]); GRID.get(k).push(i);
+      }
+  });
+}
+const _near=[];
+function nearCol(x,z,pad){
+  _near.length=0;
+  const seen=new Set();
+  for(let ix=Math.floor((x-pad)/CELL); ix<=Math.floor((x+pad)/CELL); ix++)
+    for(let iz=Math.floor((z-pad)/CELL); iz<=Math.floor((z+pad)/CELL); iz++){
+      const arr=GRID.get(gkey(ix,iz)); if(!arr) continue;
+      for(const i of arr) if(!seen.has(i)){ seen.add(i); _near.push(COLLIDERS[i]); }
+    }
+  return _near;
+}
+const STEP_UP = 0.44;
+const body = ()=> PL.fly ? BODY.fly : BODY.walk;
+function overlaps(x,y,z,r,h){
+  for(const c of nearCol(x,z,r+0.6)){
+    if(x+r<=c.x0||x-r>=c.x1) continue;
+    if(z+r<=c.z0||z-r>=c.z1) continue;
+    if(y+h<=c.y0||y>=c.y1) continue;
+    return c;
+  }
+  return null;
+}
+function hits(x,y,z){ const b=body(); return overlaps(x, y+b.off, z, b.r, b.h); }
+function stepTarget(x,y,z,r,h){
+  let top=-1;
+  for(const c of nearCol(x,z,r+0.6)){
+    if(x+r<=c.x0||x-r>=c.x1) continue;
+    if(z+r<=c.z0||z-r>=c.z1) continue;
+    if(y+h<=c.y0||y>=c.y1) continue;
+    if(c.y1-y > STEP_UP) return -1;
+    if(c.y1>top) top=c.y1;
+  }
+  return top;
+}
+function moveAxis(axis,d){
+  if(Math.abs(d)<1e-6 || NOCLIP){
+    if(NOCLIP){ if(axis===0) PL.pos.x+=d; else PL.pos.z+=d; }
+    return;
+  }
+  const b = body(), p = PL.pos;
+  const n = Math.min(20, Math.max(1, Math.ceil(Math.abs(d)/(b.r*0.5))));
+  const dd = d/n;
+  for(let i=0;i<n;i++){
+    const stuck = !!hits(p.x,p.y,p.z);
+    const nx = axis===0 ? p.x+dd : p.x, nz = axis===2 ? p.z+dd : p.z;
+    if(!hits(nx,p.y,nz) || stuck){ if(axis===0) p.x=nx; else p.z=nz; continue; }
+    if(PL.fly){ if(axis===0) PL.vel.x=0; else PL.vel.z=0; return; }
+    const top = stepTarget(nx,p.y,nz,b.r,b.h);
+    if(top > p.y+0.001 && !hits(nx, top+0.03, nz)){
+      p.y = top+0.03; if(axis===0) p.x=nx; else p.z=nz;
+      PL.onGround=true; PL.vel.y=Math.max(PL.vel.y,0);
+    } else { if(axis===0) PL.vel.x=0; else PL.vel.z=0; return; }
+  }
+}
+function moveY(d){
+  if(Math.abs(d)<1e-6) return;
+  if(NOCLIP){ PL.pos.y+=d; return; }
+  const b = body(), p = PL.pos;
+  const n = Math.min(20, Math.max(1, Math.ceil(Math.abs(d)/(b.h*0.45))));
+  const dd = d/n;
+  for(let i=0;i<n;i++){
+    const stuck = !!hits(p.x,p.y,p.z);
+    const ny = p.y+dd;
+    if(!hits(p.x,ny,p.z) || stuck) p.y = ny;
+    else { PL.vel.y = 0; return; }
+  }
+}
+function depenetrate(){
+  if(NOCLIP) return;
+  const b = body(), p = PL.pos;
+  for(let i=0;i<4;i++){
+    const c = hits(p.x,p.y,p.z);
+    if(!c) return;
+    const by = p.y + b.off;
+    const cand = [
+      [(c.x1+b.r)-p.x,'x+'], [p.x-(c.x0-b.r),'x-'],
+      [(c.z1+b.r)-p.z,'z+'], [p.z-(c.z0-b.r),'z-']
+    ];
+    const up = (c.y1+0.02) - by, down = (by+b.h) - (c.y0-0.02);
+    if(PL.fly) cand.push([up,'y+'],[down,'y-']);
+    else if(up <= STEP_UP) cand.push([up,'y+']);
+    let best=Infinity, mode=null;
+    for(const [v,m] of cand) if(v>=0 && v<best){ best=v; mode=m; }
+    if(!mode) return;
+    if(mode==='x+') p.x = c.x1+b.r+0.001;
+    else if(mode==='x-') p.x = c.x0-b.r-0.001;
+    else if(mode==='z+') p.z = c.z1+b.r+0.001;
+    else if(mode==='z-') p.z = c.z0-b.r-0.001;
+    else if(mode==='y+') p.y = c.y1-b.off+0.02;
+    else p.y = c.y0-b.off-b.h-0.02;
+  }
+}
+function groundH(x,z,yFrom){
+  let best=0;
+  const r = BODY.walk.r;
+  for(const c of nearCol(x,z,r+0.5)){
+    if(x+r<=c.x0||x-r>=c.x1) continue;
+    if(z+r<=c.z0||z-r>=c.z1) continue;
+    if(c.y1<=yFrom+0.35 && c.y1>best) best=c.y1;
+  }
+  return best;
+}
+
+addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if(['Space','KeyW','KeyA','KeyS','KeyD','ControlLeft','Tab'].includes(e.code)) e.preventDefault();
+  if(e.code==='KeyG'){ PL.fly=!PL.fly; PL.vel.set(0,0,0); depenetrate(); }
+  if(e.code==='KeyV'){ NOCLIP=!NOCLIP; if(!NOCLIP) depenetrate(); }
+  if(e.code==='F3'){ e.preventDefault(); const f=$('#fps'); f.style.display = f.style.display==='none'?'block':'none'; }
+});
+addEventListener('keyup', e=>{ keys[e.code]=false; });
+addEventListener('mousemove', e=>{
+  if(!locked) return;
+  PL.yaw -= e.movementX*SENS;
+  PL.pitch = clamp(PL.pitch - e.movementY*SENS, -1.52, 1.52);
+});
+addEventListener('wheel', e=>{ if(locked) PL.speed = clamp(PL.speed*(e.deltaY>0?0.9:1.11), 0.7, 34); }, {passive:true});
+renderer.domElement.addEventListener('mousedown', ()=>{ if(!locked) renderer.domElement.requestPointerLock(); });
+document.addEventListener('pointerlockchange', ()=>{
+  locked = document.pointerLockElement === renderer.domElement;
+  $('#gate').classList.toggle('hide', locked);
+});
+addEventListener('contextmenu', e=>e.preventDefault());
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const fwd = new THREE.Vector3(), right = new THREE.Vector3(), tmp = new THREE.Vector3();
+function update(dt){
+  const boost = (keys['ShiftLeft']||keys['ShiftRight']) ? 3.0
+              : (keys['AltLeft']||keys['AltRight']) ? 0.3 : 1;
+  fwd.set(-Math.sin(PL.yaw),0,-Math.cos(PL.yaw));
+  right.set(Math.cos(PL.yaw),0,-Math.sin(PL.yaw));
+  let ix=0, iz=0;
+  if(keys['KeyW']) iz+=1; if(keys['KeyS']) iz-=1;
+  if(keys['KeyD']) ix+=1; if(keys['KeyA']) ix-=1;
+  if(ix||iz){ const l=Math.hypot(ix,iz); ix/=l; iz/=l; }
+
+  if(PL.fly){
+    const look = new THREE.Vector3(
+      -Math.sin(PL.yaw)*Math.cos(PL.pitch), Math.sin(PL.pitch), -Math.cos(PL.yaw)*Math.cos(PL.pitch));
+    const sp = PL.speed*boost;
+    tmp.set(0,0,0).addScaledVector(look, iz*sp).addScaledVector(right, ix*sp);
+    if(keys['Space']) tmp.y += sp;
+    if(keys['ControlLeft']||keys['ControlRight']) tmp.y -= sp;
+    PL.vel.lerp(tmp, Math.min(1, dt*7.5));
+    moveAxis(0, PL.vel.x*dt); moveAxis(2, PL.vel.z*dt); moveY(PL.vel.y*dt);
+    depenetrate();
+    PL.pos.x = clamp(PL.pos.x, -HW-4, HW+4);
+    PL.pos.z = clamp(PL.pos.z, -HD-4, HD+4);
+    PL.pos.y = clamp(PL.pos.y, 0.22, RIDGE+2);
+  } else {
+    const sp = 3.5*boost;
+    tmp.set(0,0,0).addScaledVector(fwd, iz*sp).addScaledVector(right, ix*sp);
+    const acc = PL.onGround ? 13 : 3;
+    PL.vel.x += (tmp.x-PL.vel.x)*Math.min(1,acc*dt);
+    PL.vel.z += (tmp.z-PL.vel.z)*Math.min(1,acc*dt);
+    PL.vel.y -= 19*dt;
+    if(keys['Space'] && PL.onGround && !PL.jl){ PL.vel.y=5.9; PL.onGround=false; PL.jl=true; }
+    if(!keys['Space']) PL.jl=false;
+    moveAxis(0, PL.vel.x*dt); moveAxis(2, PL.vel.z*dt);
+    depenetrate();
+    PL.pos.y += PL.vel.y*dt;
+    const gh = groundH(PL.pos.x, PL.pos.z, PL.pos.y);
+    if(PL.vel.y<=0 && PL.pos.y<=gh+0.001){ PL.pos.y=gh; PL.vel.y=0; PL.onGround=true; }
+    else {
+      PL.onGround=false;
+      const up = hits(PL.pos.x,PL.pos.y,PL.pos.z);
+      if(up && PL.vel.y>0 && up.y0>PL.pos.y){ PL.pos.y=up.y0-BODY.walk.h-0.01; PL.vel.y=0; }
+    }
+    if(PL.pos.y < -8){ PL.pos.set(-14.6,1.66,-30.0); PL.vel.set(0,0,0); }
+  }
+
+  camera.position.set(PL.pos.x, PL.pos.y + (PL.fly?0:PL.eye), PL.pos.z);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.set(PL.pitch, PL.yaw, 0, 'YXZ');
+}
+
+/* ============================================================================
+   ЦИКЛ
+============================================================================ */
+const clock = new THREE.Clock();
+let fpsAcc=0, fpsN=0, fpsT=0;
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt);
+  renderer.render(scene, camera);
+  fpsAcc += 1/Math.max(dt,1e-4); fpsN++; fpsT += dt;
+  if(fpsT > 0.5){
+    const el = $('#fps');
+    if(el.style.display !== 'none'){
+      el.textContent = `${(fpsAcc/fpsN).toFixed(0)} fps · ${(NSPL/1000).toFixed(0)}k splats · `
+        + `${PL.pos.x.toFixed(0)},${PL.pos.y.toFixed(1)},${PL.pos.z.toFixed(0)} · v${PL.speed.toFixed(1)}`;
+    }
+    fpsAcc=0; fpsN=0; fpsT=0;
+  }
+}
+
+/* ============================================================================
+   СТАРТ
+============================================================================ */
+const setMsg = (t,p)=>{
+  $('#g_msg').textContent = t;
+  if(p!==undefined) $('#bar i').style.width = (p*100).toFixed(0)+'%';
+};
+const idle = ()=> new Promise(r=> setTimeout(r, 0));
+
+async function build(){
+  const t0 = performance.now();
+  const T = {};
+  const mark = (k)=>{ T[k] = Math.round(performance.now()-t0); };
+  setMsg('Построение геометрии…', 0.05); await idle();
+  describeScene();
+  mark('geom');
+
+  setMsg('Расчёт теней…', 0.22); await idle();
+  buildShadowMap();
+  mark('shadow');
+
+  setMsg('Расчёт затенения…', 0.42); await idle();
+  buildAO();
+  buildOpenness();
+  buildFixtureGrid();
+  mark('ao');
+
+  setMsg('Генерация сплатов…', 0.58); await idle();
+  await new Promise(resolve=>{
+    splatMesh = new SplatMesh({
+      constructSplats: (s)=>{ SPLATS = s; emitAll(); },
+      onLoad: ()=> resolve()
+    });
+    scene.add(splatMesh);
+  });
+  mark('splats');
+
+  setMsg('Коллизии…', 0.92); await idle();
+  buildGrid();
+  mark('total');
+
+  const secs = ((performance.now()-t0)/1000).toFixed(1);
+  $('#g_load').style.display = 'none';
+  $('#g_ready').style.display = 'block';
+  $('#g_stat').textContent =
+    `${(NSPL/1000).toFixed(0)}k сплатов · ${QUADS.length} поверхностей · ${COLLIDERS.length} коллайдеров · ${secs} с`
+    + `\nкачество: ${QNAME} — ?q=low | med | high | ultra`;
+  $('#g_go').onclick = ()=> renderer.domElement.requestPointerLock();
+
+  window.ANGAR_GS = {
+    THREE, scene, camera, renderer, spark, splatMesh,
+    colliders: COLLIDERS, player: PL, keys, step: dt=>update(dt),
+    bounds:{hw:HW, hd:HD, eave:EAVE, ridge:RIDGE, f2:F2},
+    stats:{splats:NSPL, quads:QUADS.length, colliders:COLLIDERS.length,
+           fixtures:FIXTURES.length, seconds:+secs, timings:T},
+    debug:{tagAt, textHit, sunVis, aoAt, openAt, shade, hits, groundH,
+           inRoofLight, inSideGlass, QUADS, FIXTURES, TAGS, roofYx,
+           free:(x,y,z)=>!overlaps(x,y-0.88,z,0.34,1.76)},
+    ready: true
+  };
+  camera.position.set(PL.pos.x, PL.pos.y, PL.pos.z);
+  loop();
+}
+
+build().catch(err=>{
+  console.error(err);
+  $('#g_load').innerHTML = '<p style="color:#d9736b">Ошибка: '+String(err&&err.message||err)+'</p>';
+  window.ANGAR_ERR = String(err && err.stack || err);
+});
+</script>
+</body>
+</html>
