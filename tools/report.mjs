@@ -1,0 +1,11 @@
+import {chromium} from 'playwright';
+const q = process.argv[2]||'high';
+const b = await chromium.launch({args:['--no-sandbox','--disable-gpu-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const p = await b.newPage({viewport:{width:1000,height:600}});
+const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
+await p.goto('http://127.0.0.1:8099/angar.html?q='+q,{waitUntil:'load',timeout:120000});
+await p.waitForFunction(()=>window.HANGAR_MAP,null,{timeout:240000});
+console.log(JSON.stringify(await p.evaluate(()=>window.HANGAR_MAP.stats),null,1));
+console.log('quality', await p.evaluate(()=>window.HANGAR_MAP.quality));
+console.log('errors', errs.slice(0,8));
+await b.close();
