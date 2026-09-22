@@ -1,0 +1,1242 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Плоскость · Начертательная геометрия · Лекция 3</title>
+<meta name="description" content="Интерактивный конспект: способы задания плоскости и её положение относительно плоскостей проекций. 3D-чертежи с вращением и развёрткой в эпюр.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&family=STIX+Two+Text:ital,wght@0,500;0,600;1,500;1,600;1,700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script>try{var t=localStorage.getItem('ng-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>
+:root{
+  --font:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --head:'Unbounded','Manrope',system-ui,sans-serif;
+  --math:'STIX Two Text','Cambria Math','Times New Roman',serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --r:22px;
+}
+[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#07061a;--bg2:#100d2e;--card:rgba(22,19,58,.72);--card2:rgba(255,255,255,.06);
+  --line:rgba(255,255,255,.10);--line2:rgba(255,255,255,.18);
+  --text:#f1f2ff;--muted:#b3b6de;--dim:#7f83b5;
+  --vbg:radial-gradient(120% 95% at 18% 8%,#221a5e 0%,#100c33 50%,#08061c 100%);
+  --halo:#0b0826;--shadow:0 24px 70px -28px rgba(0,0,0,.85);
+  --a1:#ff4fd8;--a2:#8b5cff;--a3:#22d3ee;--a4:#a3e635;--a5:#fbbf24;--a6:#ff8a3d;
+  --grid-op:.33;
+}
+[data-theme=light]{
+  color-scheme:light;
+  --bg:#f4f5ff;--bg2:#ffffff;--card:rgba(255,255,255,.86);--card2:rgba(80,70,200,.06);
+  --line:rgba(30,27,95,.12);--line2:rgba(30,27,95,.22);
+  --text:#15133a;--muted:#474b78;--dim:#7a7ea8;
+  --vbg:radial-gradient(120% 95% at 18% 8%,#ffffff 0%,#f3f3ff 55%,#e7e8fb 100%);
+  --halo:#ffffff;--shadow:0 22px 55px -30px rgba(50,35,150,.45);
+  --a1:#db2777;--a2:#6d28d9;--a3:#0891b2;--a4:#4d7c0f;--a5:#b45309;--a6:#ea580c;
+  --grid-op:.55;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--text);font:16.5px/1.65 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden;transition:background .4s,color .4s}
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+  radial-gradient(42vw 42vw at 6% -4%,color-mix(in srgb,var(--a1) 24%,transparent),transparent 70%),
+  radial-gradient(46vw 46vw at 100% 12%,color-mix(in srgb,var(--a3) 20%,transparent),transparent 70%),
+  radial-gradient(55vw 50vw at 45% 115%,color-mix(in srgb,var(--a2) 26%,transparent),transparent 70%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--grid-op);
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:28px 28px;-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 25%,transparent 80%);mask-image:radial-gradient(ellipse at 50% 30%,#000 25%,transparent 80%)}
+a{color:inherit}
+::selection{background:color-mix(in srgb,var(--a1) 40%,transparent)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 22px}
+.grad{background:linear-gradient(95deg,var(--a1),var(--a2) 45%,var(--a3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.m{font-family:var(--math);font-style:italic;font-weight:600;font-size:1.1em;white-space:nowrap}
+.m sub,.lbl sub,.nota sub,.vbadge sub{font-style:normal;font-size:.68em;vertical-align:-.3em;line-height:0}
+sub{line-height:0}
+
+/* ---------- nav ---------- */
+.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
+  background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:16px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font:700 15px var(--head);text-decoration:none;white-space:nowrap}
+.logo i{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font:italic 700 18px var(--math);color:#fff;
+  background:conic-gradient(from 200deg,var(--a1),var(--a2),var(--a3),var(--a1));box-shadow:0 0 22px -4px var(--a2)}
+.links{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1;mask-image:linear-gradient(90deg,#000 92%,transparent)}
+.links::-webkit-scrollbar{display:none}
+.links a{padding:7px 11px;border-radius:10px;text-decoration:none;font:600 13.5px var(--font);color:var(--muted);white-space:nowrap;transition:.2s}
+.links a:hover{color:var(--text);background:var(--card2)}
+.links a.on{color:var(--text);background:color-mix(in srgb,var(--a2) 22%,transparent)}
+.theme{flex:none;width:44px;height:44px;border-radius:14px;border:1px solid var(--line2);background:var(--card2);color:var(--text);cursor:pointer;display:grid;place-items:center;font-size:19px;transition:.25s}
+.theme:hover{transform:rotate(-15deg) scale(1.06);border-color:var(--a2)}
+.progress{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:linear-gradient(90deg,var(--a1),var(--a2),var(--a3));box-shadow:0 0 12px var(--a2)}
+
+/* ---------- hero ---------- */
+.hero{padding:74px 0 30px;position:relative}
+.kicker{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;border:1px solid var(--line2);background:var(--card2);font:700 12.5px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kicker b{width:8px;height:8px;border-radius:50%;background:var(--a4);box-shadow:0 0 10px var(--a4)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:34px;align-items:center}
+.viewer.hero-v{height:500px}
+h1{font:800 clamp(30px,4.1vw,56px)/1.06 var(--head);letter-spacing:-.025em;margin:22px 0 18px}
+.lead{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:760px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.chip{display:inline-flex;align-items:center;gap:9px;padding:8px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);font-weight:600;font-size:14.5px}
+.chip .sw{width:14px;height:14px;border-radius:4px;background:var(--c);box-shadow:0 0 12px var(--c)}
+.howto{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:30px}
+.howto div{padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line);font-size:14px;color:var(--muted)}
+.howto b{display:block;color:var(--text);font-size:15px;margin-bottom:2px}
+.howto span{font-size:22px;display:block;margin-bottom:6px}
+
+/* ---------- sections ---------- */
+section{padding:64px 0 20px}
+.sh{display:flex;align-items:flex-end;gap:18px;margin-bottom:26px}
+.sh .no{font:800 15px var(--mono);color:#fff;min-width:54px;height:54px;border-radius:17px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--a1),var(--a2));box-shadow:0 12px 30px -10px var(--a2)}
+h2{font:700 clamp(25px,3.6vw,40px)/1.12 var(--head);letter-spacing:-.02em;margin:0}
+.sh p{margin:6px 0 0;color:var(--muted)}
+h3{font:700 clamp(19px,2.2vw,23px)/1.25 var(--head);margin:0 0 10px;letter-spacing:-.01em}
+h4{font:800 13px var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--shadow);position:relative}
+.card p{margin:0 0 10px}
+.card p:last-child{margin-bottom:0}
+.muted{color:var(--muted)}
+
+.topic{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px;align-items:stretch;margin-bottom:22px}
+.topic.rev{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
+.topic.rev>.viewer{order:2}
+.topic .card{display:flex;flex-direction:column}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.way{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.way .viewer{border-radius:0;border:0;border-bottom:1px solid var(--line);height:380px}
+.way .body{padding:18px 22px 22px}
+.tag{display:inline-flex;align-items:center;gap:8px;font:800 12px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--c,var(--a3));margin-bottom:8px}
+.tag::before{content:"";width:18px;height:2px;border-radius:2px;background:currentColor;box-shadow:0 0 8px currentColor}
+.nota{display:inline-block;font:italic 600 21px/1.2 var(--math);padding:5px 14px;border-radius:12px;margin:2px 0 12px;
+  background:color-mix(in srgb,var(--c,var(--a2)) 16%,transparent);border:1px solid color-mix(in srgb,var(--c,var(--a2)) 45%,transparent);color:var(--text)}
+.big-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.roman{font:800 14px var(--mono);padding:4px 10px;border-radius:10px;color:#fff;background:var(--c,var(--a2));box-shadow:0 0 18px -4px var(--c,var(--a2))}
+
+/* callouts */
+.note{border-radius:16px;padding:14px 16px 14px 50px;margin:12px 0 0;position:relative;font-size:15.5px;background:color-mix(in srgb,var(--c) 11%,transparent);border:1px solid color-mix(in srgb,var(--c) 32%,transparent)}
+.note::before{content:attr(data-i);position:absolute;left:14px;top:12px;font-size:20px}
+.note b.h{display:block;font:800 12px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--c);margin-bottom:2px}
+.tip{--c:var(--a3)} .warn{--c:var(--a6)} .key{--c:var(--a1)} .ok{--c:var(--a4)}
+.props{list-style:none;padding:0;margin:4px 0 0;counter-reset:p}
+.props li{position:relative;padding:4px 0 10px 42px;counter-increment:p}
+.props li::before{content:counter(p);position:absolute;left:0;top:3px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font:800 13px var(--mono);color:#fff;background:linear-gradient(135deg,var(--c,var(--a1)),var(--a2))}
+.facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:12px}
+.fact{font-size:13.5px;font-weight:600;padding:6px 11px;border-radius:10px;background:var(--card2);border:1px solid var(--line)}
+.defn{font-size:clamp(17px,2vw,19.5px);line-height:1.55;padding:20px 24px;border-radius:18px;margin-bottom:18px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--a1) 16%,transparent),color-mix(in srgb,var(--a3) 12%,transparent));border:1px solid var(--line2)}
+.defn b{color:var(--text)}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+.flow span{padding:8px 13px;border-radius:12px;background:var(--card2);border:1px solid var(--line);font:italic 600 17px var(--math)}
+.flow i{font-style:normal;color:var(--a1);font-weight:800}
+.symbols{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:14px}
+.symbols div{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--card2);border:1px solid var(--line);font-size:14px;color:var(--muted)}
+.symbols b{font:italic 700 22px var(--math);color:var(--text);min-width:30px;text-align:center}
+
+/* classification tree */
+.tree{display:grid;gap:16px}
+.node{display:block;text-decoration:none;padding:16px 18px;border-radius:18px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--c) 20%,transparent),color-mix(in srgb,var(--c) 6%,transparent));transition:transform .2s,box-shadow .2s}
+a.node:hover{transform:translateY(-3px);box-shadow:0 16px 36px -18px var(--c)}
+.node>b{display:block;font:700 16px var(--head);margin-bottom:3px}
+.node small{color:var(--muted);font-size:14px;display:block;line-height:1.45}
+.tree .root{--c:var(--a2);text-align:center}
+.tree .lvl{display:grid;grid-template-columns:1fr 2fr;gap:16px}
+.tree .sub{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tree .col{display:grid;gap:10px;align-content:start}
+.tree .leaf{padding:11px 14px;border-radius:14px}
+.tree .leaf>b{font-size:14px}
+
+/* table */
+.tbl{overflow-x:auto;border-radius:var(--r);border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:860px;font-size:14.5px}
+th,td{padding:13px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{font:800 12px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);background:var(--card2)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:700;white-space:nowrap}
+td:first-child i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:9px;background:var(--c);box-shadow:0 0 10px var(--c)}
+tbody tr:hover{background:var(--card2)}
+.grp td{font:800 12px var(--font);letter-spacing:.1em;text-transform:uppercase;color:var(--a1);background:color-mix(in srgb,var(--a1) 8%,transparent)}
+
+/* quiz */
+.quiz{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.q{perspective:1200px;cursor:pointer;border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit}
+.qi{display:grid;transition:transform .7s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d;height:100%}
+.q.on .qi{transform:rotateY(180deg)}
+.qf{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:18px;padding:18px 18px 40px;min-height:170px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);position:relative}
+.qf small{position:absolute;left:18px;bottom:14px;font:700 11px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.qf em{font-style:normal;font:800 12px var(--mono);color:var(--a1);display:block;margin-bottom:8px}
+.qb{transform:rotateY(180deg);background:linear-gradient(150deg,color-mix(in srgb,var(--a2) 26%,var(--bg2)),color-mix(in srgb,var(--a3) 18%,var(--bg2)));border-color:var(--line2)}
+.qb em{color:var(--a4)}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- 3D viewer ---------- */
+.viewer{position:relative;height:440px;border-radius:var(--r);overflow:hidden;background:var(--vbg);border:1px solid var(--line);cursor:grab;user-select:none;-webkit-user-select:none;box-shadow:var(--shadow);isolation:isolate}
+.viewer:active{cursor:grabbing}
+.viewer.tall{height:520px}
+.viewer canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block;outline:none}
+.viewer:fullscreen{height:100vh;border-radius:0}
+.lbl-layer{position:absolute!important;inset:0;pointer-events:none;transition:opacity .3s}
+.lbl{pointer-events:none}
+.lbl span{display:block;font:italic 600 17px/1 var(--math);white-space:nowrap;transition:opacity .15s;
+  text-shadow:0 0 2px var(--halo),0 0 5px var(--halo),0 0 9px var(--halo),0 0 14px var(--halo)}
+.lbl.ax span{font-size:19px;font-weight:700}
+.lbl.sm span{font-size:14px}
+.lbl.pl span{font-size:20px;font-weight:700;opacity:.95}
+.lbl.big span{font-size:21px;font-weight:700}
+.lbl.tg span{font:800 11px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:99px;text-shadow:none;
+  background:color-mix(in srgb,currentColor 16%,var(--halo));border:1px solid currentColor}
+.vbadge{position:absolute;top:12px;left:12px;z-index:3;font:italic 600 18px/1.2 var(--math);padding:7px 13px;border-radius:13px;pointer-events:none;
+  background:color-mix(in srgb,var(--bg2) 70%,transparent);border:1px solid var(--line2);backdrop-filter:blur(6px)}
+.vhint{position:absolute;top:14px;right:14px;z-index:3;font:600 11.5px var(--font);color:var(--dim);pointer-events:none;transition:opacity .6s;text-align:right}
+.viewer.touched .vhint{opacity:0}
+.vtoast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);z-index:4;padding:10px 16px;border-radius:14px;font:700 14px var(--font);pointer-events:none;opacity:0;transition:.25s;
+  background:color-mix(in srgb,var(--bg2) 88%,transparent);border:1px solid var(--line2)}
+.vtoast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.vbar{position:absolute;left:10px;right:10px;bottom:10px;z-index:3;display:flex;gap:7px;align-items:center;cursor:default}
+.vb{flex:none;height:36px;padding:0 13px;border-radius:12px;border:1px solid var(--line2);background:color-mix(in srgb,var(--bg2) 78%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:var(--text);font:700 13px var(--font);cursor:pointer;transition:.2s;white-space:nowrap}
+.vb:hover{border-color:var(--a2);transform:translateY(-1px)}
+.vb.ico{width:36px;padding:0;font-size:16px}
+.vb.mode{background:linear-gradient(95deg,var(--a1),var(--a2));border:0;color:#fff;box-shadow:0 8px 22px -10px var(--a1)}
+.vb.off{opacity:.45}
+.vb.on{background:color-mix(in srgb,var(--a4) 35%,var(--bg2))}
+.vb.touch{display:none}
+@media (pointer:coarse){.vb.touch{display:block}}
+.vslider{flex:1;min-width:70px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);
+  background:color-mix(in srgb,var(--bg2) 78%,transparent);backdrop-filter:blur(8px);font:700 10.5px var(--mono);color:var(--dim)}
+.vslider input{flex:1;min-width:30px;accent-color:var(--a1);cursor:pointer}
+.viewer.nogl::after{content:"WebGL недоступен в этом браузере — 3D-чертёж не может быть показан";position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;color:var(--muted);font-weight:600}
+
+footer{padding:60px 0 50px;color:var(--dim);font-size:14px;text-align:center}
+footer b{color:var(--muted)}
+
+@media (max-width:980px){
+  .topic,.topic.rev{grid-template-columns:1fr}
+  .topic.rev>.viewer{order:0}
+  .grid3{grid-template-columns:1fr}
+  .howto{grid-template-columns:repeat(2,1fr)}
+  .tree .lvl{grid-template-columns:1fr}
+  .hero-grid{grid-template-columns:1fr}
+  .viewer.hero-v{height:420px}
+}
+@media (max-width:720px){
+  .grid2{grid-template-columns:1fr}
+  .tree .sub{grid-template-columns:1fr}
+  .viewer{height:400px}
+  .viewer.tall{height:440px}
+  .way .viewer{height:350px}
+  .vhint{display:none}
+  .vb.mode span{display:none}
+  .vb.mode::before{content:"⇅ Эпюр"}
+  .wrap{padding:0 14px}
+  .card{padding:18px}
+  .card.way{padding:0}
+  .vbar{gap:5px;left:8px;right:8px}
+  .vb.ico{width:34px}
+  .vslider{min-width:48px;padding:0 9px}
+  .nav .wrap{gap:10px}
+  .logo span{display:none}
+  .sh{flex-direction:column;align-items:flex-start;gap:12px}
+  .sh .no{min-width:44px;height:44px;border-radius:14px;font-size:13px}
+  .vslider b{display:none}
+  .hero{padding-top:44px}
+}
+@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="logo" href="#top"><i>Σ</i><span>НГ · Лекция 3</span></a>
+    <div class="links">
+      <a href="#basics">Основы</a>
+      <a href="#ways">Способы задания</a>
+      <a href="#traces">Следы</a>
+      <a href="#classes">Классификация</a>
+      <a href="#general">Общего положения</a>
+      <a href="#projecting">Проецирующие</a>
+      <a href="#level">Уровня</a>
+      <a href="#cheat">Шпаргалка</a>
+      <a href="#quiz">Самопроверка</a>
+    </div>
+    <button class="theme" id="theme" title="Сменить тему" aria-label="Сменить тему">☀️</button>
+  </div>
+  <div class="progress" id="progress"></div>
+</nav>
+
+<header class="hero wrap" id="top">
+ <div class="hero-grid">
+ <div>
+  <span class="kicker"><b></b>Начертательная геометрия · Лекция №3</span>
+  <h1>Плоскость: <span class="grad">способы задания</span> и положение относительно плоскостей проекций</h1>
+  <p class="lead">Вся теория лекции — коротко и простым языком. Каждый чертёж здесь живой: его можно вращать, приближать и одним нажатием «разложить» в комплексный чертёж (эпюр).</p>
+  <div class="chips">
+    <span class="chip" style="--c:var(--c-H)"><i class="sw"></i><span class="m">Π<sub>1</sub></span> — горизонтальная плоскость проекций</span>
+    <span class="chip" style="--c:var(--c-V)"><i class="sw"></i><span class="m">Π<sub>2</sub></span> — фронтальная</span>
+    <span class="chip" style="--c:var(--c-W)"><i class="sw"></i><span class="m">Π<sub>3</sub></span> — профильная</span>
+  </div>
+ </div>
+  <div class="viewer hero-v" data-scene="hero" data-auto="1" data-badge="Потяни меня мышью ↻"></div>
+ </div>
+  <div class="howto">
+    <div><span>🖱️</span><b>Вращай</b>Зажми левую кнопку мыши (или палец) и тяни</div>
+    <div><span>🔍</span><b>Приближай</b>Ctrl + колесо, щипок на телефоне; ПКМ — сдвиг</div>
+    <div><span>🗂️</span><b>Эпюр</b>Кнопка или ползунок разворачивают плоскости в КЧ</div>
+    <div><span>🌗</span><b>Тема</b>Переключатель тёмной/светлой темы — справа вверху</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============ 0. BASICS ============ -->
+<section id="basics">
+  <div class="sh rv"><div class="no">00</div><div><h2>Сначала — как всё устроено</h2><p>Короткое напоминание, чтобы понимать обозначения на всех чертежах.</p></div></div>
+  <div class="topic rv">
+    <div class="viewer tall" data-scene="intro" data-badge="Точка A и её проекции"></div>
+    <div class="card">
+      <h3>Система плоскостей проекций</h3>
+      <p>Представь угол комнаты: <b style="color:var(--c-H)">пол</b> — это <span class="m">Π<sub>1</sub></span>, <b style="color:var(--c-V)">задняя стена</b> — <span class="m">Π<sub>2</sub></span>, <b style="color:var(--c-W)">боковая стена</b> — <span class="m">Π<sub>3</sub></span>. Они пересекаются по осям <span class="m">x, y, z</span> в точке <span class="m">O</span>.</p>
+      <p>Из точки <span class="m">A</span> опускаем перпендикуляры на каждую плоскость и получаем проекции: <span class="m">A<sub>1</sub></span> — горизонтальную, <span class="m">A<sub>2</sub></span> — фронтальную, <span class="m">A<sub>3</sub></span> — профильную. <b>Индекс = номер плоскости проекций.</b></p>
+      <p><b>Комплексный чертёж (КЧ, эпюр)</b> — это когда плоскости «раскладывают» в одну: <span class="m">Π<sub>1</sub></span> поворачивают вниз вокруг оси <span class="m">x</span>, <span class="m">Π<sub>3</sub></span> — вправо вокруг оси <span class="m">z</span>. Нажми «Развернуть в эпюр» и посмотри, как это происходит.</p>
+      <div class="note tip" data-i="💡"><b class="h">Простыми словами</b>На эпюре проекции одной точки всегда связаны <b>линиями связи</b>: <span class="m">A<sub>1</sub>A<sub>2</sub> ⊥ x</span>, <span class="m">A<sub>2</sub>A<sub>3</sub> ⊥ z</span>.</div>
+    </div>
+  </div>
+  <div class="card rv">
+    <h4 style="margin-top:0">Значки, которые встретятся</h4>
+    <div class="symbols">
+      <div><b>∥</b>параллельно</div>
+      <div><b>⊥</b>перпендикулярно</div>
+      <div><b>∩</b>пересекаются</div>
+      <div><b>≡</b>совпадает</div>
+      <div><b>⊂</b>лежит в (принадлежит)</div>
+      <div><b>Π</b>плоскость проекций</div>
+      <div><b>Σ Ψ Λ Θ</b>обычные плоскости</div>
+      <div><b>н.в.</b>натуральная величина</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 1. WAYS ============ -->
+<section id="ways">
+  <div class="sh rv"><div class="no">01</div><div><h2>Способы задания плоскости</h2><p>Положение плоскости в пространстве может быть однозначно определено шестью способами.</p></div></div>
+
+  <div class="grid2">
+    <article class="card way rv" style="--c:var(--c-pink)">
+      <div class="viewer" data-scene="threePoints" data-badge="Ψ(A, B, C)"></div>
+      <div class="body">
+        <div class="tag">Способ 1</div>
+        <h3>Три точки, не лежащие на одной прямой</h3>
+        <div class="nota">Ψ(A, B, C)</div>
+        <p class="muted">Через три точки «не в линию» проходит ровно одна плоскость — поэтому табурет на трёх ножках никогда не шатается.</p>
+      </div>
+    </article>
+
+    <article class="card way rv" style="--c:var(--c-cyan)">
+      <div class="viewer" data-scene="linePoint" data-badge="Σ(A, l)"></div>
+      <div class="body">
+        <div class="tag">Способ 2</div>
+        <h3>Прямая и точка, не лежащая на этой прямой</h3>
+        <div class="nota">Σ(A, l)</div>
+        <p class="muted">Это тот же способ 1: возьми на прямой <span class="m">l</span> две любые точки — вместе с <span class="m">A</span> получишь три точки.</p>
+      </div>
+    </article>
+
+    <article class="card way rv" style="--c:var(--c-lime)">
+      <div class="viewer" data-scene="parallel" data-badge="Λ(a ∥ b)"></div>
+      <div class="body">
+        <div class="tag">Способ 3</div>
+        <h3>Две параллельные прямые</h3>
+        <div class="nota">Λ(a ∥ b)</div>
+        <p class="muted">На КЧ одноимённые проекции параллельных прямых тоже параллельны: <span class="m">a<sub>1</sub> ∥ b<sub>1</sub></span>, <span class="m">a<sub>2</sub> ∥ b<sub>2</sub></span>.</p>
+      </div>
+    </article>
+
+    <article class="card way rv" style="--c:var(--c-amber)">
+      <div class="viewer" data-scene="intersect" data-badge="Σ(c ∩ d)"></div>
+      <div class="body">
+        <div class="tag">Способ 4</div>
+        <h3>Две пересекающиеся прямые</h3>
+        <div class="nota">Σ(c ∩ d)</div>
+        <p class="muted">Проекции точки пересечения <span class="m">K<sub>1</sub></span> и <span class="m">K<sub>2</sub></span> лежат на одной линии связи. Если нет — прямые не пересекаются, а <b>скрещиваются</b>, и плоскость они не задают.</p>
+      </div>
+    </article>
+
+    <article class="card way rv" style="--c:var(--c-violet)">
+      <div class="viewer" data-scene="figure" data-badge="Ψ(△ABC)"></div>
+      <div class="body">
+        <div class="tag">Способ 5</div>
+        <h3>Плоская фигура</h3>
+        <div class="nota">Ψ(△ABC)</div>
+        <p class="muted">Треугольник, многоугольник, круг — любая плоская фигура задаёт «свою» плоскость. Чаще всего берут треугольник.</p>
+      </div>
+    </article>
+
+    <article class="card way rv" style="--c:var(--c-orange)">
+      <div class="viewer" data-scene="tracesWay" data-badge="Θ(Θ<sub>1</sub>, Θ<sub>2</sub>)"></div>
+      <div class="body">
+        <div class="tag">Способ 6</div>
+        <h3>Следы плоскости</h3>
+        <div class="nota">Θ(Θ<sub>1</sub>, Θ<sub>2</sub>)</div>
+        <p class="muted">Плоскость задаётся линиями, по которым она пересекает плоскости проекций. Подробно — <a href="#traces">в следующем разделе</a>.</p>
+      </div>
+    </article>
+  </div>
+
+  <div class="grid3" style="margin-top:22px">
+    <div class="card rv">
+      <div class="note warn" data-i="⚠️" style="margin:0"><b class="h">Важно</b>На КЧ плоскость задаётся проекциями этих элементов, но <b>не ограничивается ими</b> — плоскость бесконечна. На 3D-чертежах полупрозрачная заливка — лишь кусочек плоскости внутри «комнаты».</div>
+    </div>
+    <div class="card rv">
+      <div class="note ok" data-i="🔁" style="margin:0"><b class="h">Всегда можно перейти</b>От любого способа задания плоскости всегда можно перейти к другому:</div>
+      <div class="flow"><span>A, B, C</span><i>→</i><span>AB и C</span><i>→</i><span>AB ∩ AC</span><i>→</i><span>△ABC</span></div>
+    </div>
+    <div class="card rv">
+      <div class="note key" data-i="✌️" style="margin:0"><b class="h">Два следа</b>В системе двух плоскостей проекций <span class="m">(Π<sub>1</sub>, Π<sub>2</sub>)</span> плоскость в общем случае имеет <b>два следа</b> — горизонтальный и фронтальный.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. TRACES ============ -->
+<section id="traces">
+  <div class="sh rv"><div class="no">02</div><div><h2>Следы плоскости</h2><p>Где плоскость «врезается» в пол и в стены.</p></div></div>
+  <div class="defn rv"><b>След плоскости</b> — линия пересечения заданной плоскости с одной из плоскостей проекций.</div>
+  <div class="topic rv">
+    <div class="viewer tall" data-scene="traces" data-badge="Γ(Γ<sub>1</sub>, Γ<sub>2</sub>)"></div>
+    <div class="card">
+      <h3>Какие бывают следы</h3>
+      <ul class="props" style="--c:var(--c-orange)">
+        <li><b>Горизонтальный</b> <span class="m">Γ<sub>1</sub> ≡ h<sub>0</sub></span> — пересечение с <span class="m">Π<sub>1</sub></span> (с «полом»).</li>
+        <li><b>Фронтальный</b> <span class="m">Γ<sub>2</sub> ≡ f<sub>0</sub></span> — пересечение с <span class="m">Π<sub>2</sub></span> (с «задней стеной»).</li>
+        <li><b>Профильный</b> <span class="m">Γ<sub>3</sub></span> — пересечение с <span class="m">Π<sub>3</sub></span>, если он есть на чертеже.</li>
+      </ul>
+      <div class="note key" data-i="🎯"><b class="h">Точка схода следов</b>Точка пересечения двух следов на оси проекций называется <b>точкой схода следов</b> (<span class="m">Γ<sub>x</sub></span> на оси <span class="m">x</span>).</div>
+      <div class="note tip" data-i="💡"><b class="h">Фишка</b>Горизонтальный след — это <b>горизонталь</b> плоскости на нулевой высоте: <span class="m">h<sub>0</sub> ≡ h<sub>01</sub></span>, а <span class="m">h<sub>02</sub></span> лежит на оси <span class="m">x</span>. Поэтому у любой горизонтали <span class="m">h</span> этой плоскости <span class="m">h<sub>1</sub> ∥ Γ<sub>1</sub></span>, <span class="m">h<sub>2</sub> ∥ x</span>. Аналогично фронталь: <span class="m">f<sub>2</sub> ∥ Γ<sub>2</sub></span>, <span class="m">f<sub>1</sub> ∥ x</span>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. CLASSES ============ -->
+<section id="classes">
+  <div class="sh rv"><div class="no">03</div><div><h2>Классификация плоскостей</h2><p>По положению относительно плоскостей проекций. Нажми на блок — перейдёшь к разделу.</p></div></div>
+  <div class="tree rv">
+    <div class="node root"><b>Плоскости относительно <span class="m">Π<sub>1</sub>, Π<sub>2</sub>, Π<sub>3</sub></span></b><small>всё зависит от того, параллельна или перпендикулярна плоскость какой-нибудь плоскости проекций</small></div>
+    <div class="lvl">
+      <a class="node" href="#general" style="--c:var(--c-orange)"><b>Общего положения</b><small>не <b>∥</b> и не <b>⊥</b> ни одной из плоскостей проекций — «стоит наискосок ко всему» и пересекает все плоскости проекций</small></a>
+      <div class="col">
+        <div class="node" style="--c:var(--c-pink)"><b>Частного положения</b><small><b>∥</b> или <b>⊥</b> какой-либо плоскости проекций</small></div>
+        <div class="sub">
+          <div class="col">
+            <a class="node" href="#projecting" style="--c:var(--c-cyan)"><b>Проецирующие</b><small><b>⊥</b> одной плоскости проекций</small></a>
+            <a class="node leaf" href="#hproj" style="--c:var(--c-H)"><b>Горизонтально-проецирующая <span class="m">⊥ Π<sub>1</sub></span></b></a>
+            <a class="node leaf" href="#fproj" style="--c:var(--c-V)"><b>Фронтально-проецирующая <span class="m">⊥ Π<sub>2</sub></span></b></a>
+            <a class="node leaf" href="#pproj" style="--c:var(--c-W)"><b>Профильно-проецирующая <span class="m">⊥ Π<sub>3</sub></span></b></a>
+          </div>
+          <div class="col">
+            <a class="node" href="#level" style="--c:var(--c-lime)"><b>Уровня</b><small><b>∥</b> одной плоскости проекций</small></a>
+            <a class="node leaf" href="#hlevel" style="--c:var(--c-H)"><b>Горизонтальная <span class="m">∥ Π<sub>1</sub></span></b></a>
+            <a class="node leaf" href="#flevel" style="--c:var(--c-V)"><b>Фронтальная <span class="m">∥ Π<sub>2</sub></span></b></a>
+            <a class="node leaf" href="#plevel" style="--c:var(--c-W)"><b>Профильная <span class="m">∥ Π<sub>3</sub></span></b></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. GENERAL ============ -->
+<section id="general">
+  <div class="sh rv"><div class="no">04</div><div><h2>Плоскость общего положения</h2><p>Самый «обычный» случай — никаких особых отношений с плоскостями проекций.</p></div></div>
+  <div class="defn rv"><b>Плоскость общего положения</b> — плоскость, не параллельная и не перпендикулярная ни одной из плоскостей проекций. То есть она <b>пересекает все плоскости проекций</b>.</div>
+  <div class="topic rv">
+    <div class="viewer tall" data-scene="general" data-badge="Σ — общего положения"></div>
+    <div class="card" style="--c:var(--c-orange)">
+      <h3>Признаки и свойства</h3>
+      <ul class="props">
+        <li>Следы плоскости <b>не параллельны и не перпендикулярны</b> ни одной из осей проекций.</li>
+        <li>Любой плоский геометрический объект (отрезок, фигура и т.п.), лежащий в этой плоскости, проецируется на <b>любую</b> плоскость проекций <b>с искажением</b>.</li>
+      </ul>
+      <div class="note tip" data-i="👀"><b class="h">Посмотри на чертёж</b>Треугольник <span class="m">ABC</span> лежит в <span class="m">Σ</span>. Все три его проекции — «сплющенные» треугольники другой формы: ни одна не равна оригиналу.</div>
+      <div class="facts"><span class="fact">3 следа: <span class="m">Σ<sub>1</sub>, Σ<sub>2</sub>, Σ<sub>3</sub></span></span><span class="fact">3 точки схода: <span class="m">Σ<sub>x</sub>, Σ<sub>y</sub>, Σ<sub>z</sub></span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. PROJECTING ============ -->
+<section id="projecting">
+  <div class="sh rv"><div class="no">05</div><div><h2>Проецирующие плоскости</h2><p>Частный случай № 1 — плоскость перпендикулярна одной из плоскостей проекций.</p></div></div>
+  <div class="defn rv"><b>Плоскости частного положения</b> — плоскости, параллельные или перпендикулярные плоскостям проекций.<br><b>Проецирующая плоскость</b> — плоскость, <b>перпендикулярная</b> одной из плоскостей проекций.</div>
+
+  <div class="topic rv" id="hproj">
+    <div class="viewer tall" data-scene="hproj" data-badge="Σ ⊥ Π<sub>1</sub>"></div>
+    <div class="card" style="--c:var(--c-H)">
+      <div class="big-title"><span class="roman">I</span><h3 style="margin:0">Горизонтально-проецирующая</h3></div>
+      <p class="muted" style="margin-top:10px">Плоскость, <b>перпендикулярная горизонтальной</b> плоскости проекций <span class="m">Π<sub>1</sub></span>. Как вертикальная стена, поставленная наискосок: сверху видна просто линией.</p>
+      <h4>Признаки и свойства</h4>
+      <ul class="props">
+        <li>Горизонтальный след <span class="m">Σ<sub>1</sub></span> расположен <b>наклонно</b> к осям <span class="m">Ox</span> и <span class="m">Oy</span> и определяет углы наклона плоскости к фронтальной (<span class="m">β</span>) и профильной (<span class="m">γ</span>) плоскостям проекций.</li>
+        <li>Горизонтальные проекции <b>всех</b> точек, прямых и плоских фигур, лежащих в плоскости, находятся <b>на её горизонтальном следе</b> <span class="m">Σ<sub>1</sub></span>.</li>
+      </ul>
+      <div class="facts"><span class="fact"><span class="m">A<sub>1</sub>B<sub>1</sub> ⊂ Σ<sub>1</sub></span></span><span class="fact"><span class="m">Σ<sub>2</sub> ⊥ Ox</span></span><span class="fact"><span class="m">Σ<sub>3</sub> ⊥ Oy</span></span></div>
+    </div>
+  </div>
+
+  <div class="topic rev rv" id="fproj">
+    <div class="viewer tall" data-scene="fproj" data-badge="Σ ⊥ Π<sub>2</sub>"></div>
+    <div class="card" style="--c:var(--c-V)">
+      <div class="big-title"><span class="roman">II</span><h3 style="margin:0">Фронтально-проецирующая</h3></div>
+      <p class="muted" style="margin-top:10px">Плоскость, <b>перпендикулярная фронтальной</b> плоскости проекций <span class="m">Π<sub>2</sub></span>. Как наклонный пандус или открытая крышка ноутбука: спереди видна линией.</p>
+      <h4>Признаки и свойства</h4>
+      <ul class="props">
+        <li>Фронтальный след <span class="m">Σ<sub>2</sub></span> расположен <b>наклонно</b> к осям <span class="m">Ox</span> и <span class="m">Oz</span> и определяет углы наклона плоскости к горизонтальной (<span class="m">α</span>) и профильной (<span class="m">γ</span>) плоскостям проекций.</li>
+        <li>Фронтальные проекции <b>всех</b> точек, прямых и плоских фигур, лежащих в плоскости, находятся <b>на её фронтальном следе</b> <span class="m">Σ<sub>2</sub></span>.</li>
+      </ul>
+      <div class="facts"><span class="fact"><span class="m">A<sub>2</sub>B<sub>2</sub>C<sub>2</sub> ⊂ Σ<sub>2</sub></span></span><span class="fact"><span class="m">Σ<sub>1</sub> ⊥ Ox</span></span><span class="fact"><span class="m">Σ<sub>3</sub> ⊥ Oz</span></span></div>
+    </div>
+  </div>
+
+  <div class="topic rv" id="pproj">
+    <div class="viewer tall" data-scene="pproj" data-badge="Σ ⊥ Π<sub>3</sub>"></div>
+    <div class="card" style="--c:var(--c-W)">
+      <div class="big-title"><span class="roman">III</span><h3 style="margin:0">Профильно-проецирующая</h3></div>
+      <p class="muted" style="margin-top:10px">Плоскость, <b>перпендикулярная профильной</b> плоскости проекций <span class="m">Π<sub>3</sub></span>. Как скат крыши, конёк которой идёт вдоль оси <span class="m">x</span>: сбоку виден линией.</p>
+      <h4>Признаки и свойства</h4>
+      <ul class="props">
+        <li>Горизонтальный <span class="m">Σ<sub>1</sub></span> и фронтальный <span class="m">Σ<sub>2</sub></span> следы <b>параллельны оси</b> <span class="m">Ox</span>, а профильный след <span class="m">Σ<sub>3</sub></span> наклонён к осям <span class="m">Oz</span> и <span class="m">Oy</span>. Он определяет углы наклона плоскости к фронтальной (<span class="m">β</span>) и горизонтальной (<span class="m">α</span>) плоскостям проекций.</li>
+        <li>Профильные проекции <b>всех</b> точек, прямых и плоских фигур, лежащих в плоскости, находятся <b>на её профильном следе</b> <span class="m">Σ<sub>3</sub></span>.</li>
+      </ul>
+      <div class="facts"><span class="fact"><span class="m">A<sub>3</sub>B<sub>3</sub> ⊂ Σ<sub>3</sub></span></span><span class="fact"><span class="m">Σ<sub>1</sub> ∥ Ox</span></span><span class="fact"><span class="m">Σ<sub>2</sub> ∥ Ox</span></span></div>
+    </div>
+  </div>
+
+  <div class="note key rv" data-i="🧠"><b class="h">Запомни главное</b>У проецирующей плоскости <b>один след наклонный</b> — на той плоскости проекций, которой она перпендикулярна. На него «падают» проекции всего, что лежит в плоскости (это называют <b>собирательным свойством</b>). А угол между этим следом и осями — это и есть углы наклона плоскости к двум другим плоскостям проекций.</div>
+</section>
+
+<!-- ============ 6. LEVEL ============ -->
+<section id="level">
+  <div class="sh rv"><div class="no">06</div><div><h2>Плоскости уровня</h2><p>Частный случай № 2 — плоскость параллельна одной из плоскостей проекций.</p></div></div>
+  <div class="defn rv"><b>Плоскость уровня</b> — плоскость, <b>параллельная</b> одной из плоскостей проекций. Все точки этой плоскости одинаково удалены от той плоскости проекций, которой она параллельна, а отрезок или плоская фигура, лежащие в плоскости уровня, проецируются на параллельную ей плоскость проекций <b>без искажения</b> (в натуральную величину, <b>н.в.</b>).</div>
+
+  <div class="topic rv" id="hlevel">
+    <div class="viewer tall" data-scene="hlevel" data-badge="Δ ∥ Π<sub>1</sub>"></div>
+    <div class="card" style="--c:var(--c-H)">
+      <div class="big-title"><span class="roman">I</span><h3 style="margin:0">Горизонтальная плоскость уровня</h3></div>
+      <p class="muted" style="margin-top:10px">Плоскость, <b>параллельная горизонтальной</b> плоскости проекций <span class="m">Π<sub>1</sub></span>. Как столешница: все точки на одной высоте.</p>
+      <h4>Признаки и свойства</h4>
+      <ul class="props">
+        <li>Фронтальный <span class="m">Δ<sub>2</sub></span> и профильный <span class="m">Δ<sub>3</sub></span> следы плоскости расположены <b>параллельно</b> осям <span class="m">Ox</span> и <span class="m">Oy</span> соответственно.</li>
+        <li>Горизонтальные проекции плоских фигур, лежащих в плоскости, проецируются <b>в натуральную величину</b>.</li>
+      </ul>
+      <div class="facts"><span class="fact"><span class="m">△A<sub>1</sub>B<sub>1</sub>C<sub>1</sub> = △ABC</span></span><span class="fact"><span class="m">Δ<sub>2</sub> ∥ Ox</span></span><span class="fact"><span class="m">Δ<sub>3</sub> ∥ Oy</span></span></div>
+    </div>
+  </div>
+
+  <div class="topic rev rv" id="flevel">
+    <div class="viewer tall" data-scene="flevel" data-badge="Φ ∥ Π<sub>2</sub>"></div>
+    <div class="card" style="--c:var(--c-V)">
+      <div class="big-title"><span class="roman">II</span><h3 style="margin:0">Фронтальная плоскость уровня</h3></div>
+      <p class="muted" style="margin-top:10px">Плоскость, <b>параллельная фронтальной</b> плоскости проекций <span class="m">Π<sub>2</sub></span>. Как школьная доска, висящая параллельно стене.</p>
+      <h4>Признаки и свойства</h4>
+      <ul class="props">
+        <li>Горизонтальный <span class="m">Φ<sub>1</sub></span> и профильный <span class="m">Φ<sub>3</sub></span> следы плоскости расположены <b>параллельно</b> осям <span class="m">Ox</span> и <span class="m">Oz</span> соответственно.</li>
+        <li>Фронтальные проекции плоских фигур, лежащих в плоскости, равны <b>их натуральной величине</b>.</li>
+      </ul>
+      <div class="facts"><span class="fact"><span class="m">△A<sub>2</sub>B<sub>2</sub>C<sub>2</sub> = △ABC</span></span><span class="fact"><span class="m">Φ<sub>1</sub> ∥ Ox</span></span><span class="fact"><span class="m">Φ<sub>3</sub> ∥ Oz</span></span></div>
+    </div>
+  </div>
+
+  <div class="topic rv" id="plevel">
+    <div class="viewer tall" data-scene="plevel" data-badge="P ∥ Π<sub>3</sub>"></div>
+    <div class="card" style="--c:var(--c-W)">
+      <div class="big-title"><span class="roman">III</span><h3 style="margin:0">Профильная плоскость уровня</h3></div>
+      <p class="muted" style="margin-top:10px">Плоскость, <b>параллельная профильной</b> плоскости проекций <span class="m">Π<sub>3</sub></span>. Как перегородка, параллельная боковой стене.</p>
+      <h4>Признаки и свойства</h4>
+      <ul class="props">
+        <li>Фронтальный <span class="m">P<sub>2</sub></span> и горизонтальный <span class="m">P<sub>1</sub></span> следы плоскости расположены <b>параллельно</b> осям <span class="m">Oz</span> и <span class="m">Oy</span> соответственно.</li>
+        <li>Профильные проекции плоских фигур, лежащих в плоскости, равны <b>их натуральной величине</b>.</li>
+      </ul>
+      <div class="facts"><span class="fact"><span class="m">△A<sub>3</sub>B<sub>3</sub>C<sub>3</sub> = △ABC</span></span><span class="fact"><span class="m">P<sub>2</sub> ∥ Oz</span></span><span class="fact"><span class="m">P<sub>1</sub> ∥ Oy</span></span></div>
+    </div>
+  </div>
+
+  <div class="note key rv" data-i="🧠"><b class="h">Запомни главное</b>Плоскость уровня параллельна одной плоскости проекций и поэтому <b>перпендикулярна двум другим</b> — то есть она ещё и «дважды проецирующая». На параллельной плоскости проекций фигура видна в <b>н.в.</b>, а на двух других сплющивается в отрезки, лежащие на следах, параллельных осям.</div>
+</section>
+
+<!-- ============ 7. CHEAT ============ -->
+<section id="cheat">
+  <div class="sh rv"><div class="no">07</div><div><h2>Шпаргалка</h2><p>Вся классификация в одной таблице — удобно повторить перед контрольной.</p></div></div>
+  <div class="tbl rv">
+    <table>
+      <thead><tr><th>Плоскость</th><th>Положение</th><th>Следы на эпюре</th><th>Что «падает» на след</th><th>Натуральная величина</th></tr></thead>
+      <tbody>
+        <tr><td style="--c:var(--c-orange)"><i></i>Общего положения</td><td>не <span class="m">∥</span> и не <span class="m">⊥</span> ни одной <span class="m">Π</span></td><td>все следы наклонены ко всем осям</td><td>ничего</td><td>нигде — всё с искажением</td></tr>
+        <tr class="grp"><td colspan="5">Проецирующие</td></tr>
+        <tr><td style="--c:var(--c-H)"><i></i>Горизонтально-проецирующая</td><td><span class="m">⊥ Π<sub>1</sub></span></td><td><span class="m">Σ<sub>1</sub></span> наклонный (углы <span class="m">β, γ</span>); <span class="m">Σ<sub>2</sub> ⊥ Ox</span>, <span class="m">Σ<sub>3</sub> ⊥ Oy</span></td><td>все горизонтальные проекции → на <span class="m">Σ<sub>1</sub></span></td><td>—</td></tr>
+        <tr><td style="--c:var(--c-V)"><i></i>Фронтально-проецирующая</td><td><span class="m">⊥ Π<sub>2</sub></span></td><td><span class="m">Σ<sub>2</sub></span> наклонный (углы <span class="m">α, γ</span>); <span class="m">Σ<sub>1</sub> ⊥ Ox</span>, <span class="m">Σ<sub>3</sub> ⊥ Oz</span></td><td>все фронтальные проекции → на <span class="m">Σ<sub>2</sub></span></td><td>—</td></tr>
+        <tr><td style="--c:var(--c-W)"><i></i>Профильно-проецирующая</td><td><span class="m">⊥ Π<sub>3</sub></span></td><td><span class="m">Σ<sub>3</sub></span> наклонный (углы <span class="m">α, β</span>); <span class="m">Σ<sub>1</sub> ∥ Ox</span>, <span class="m">Σ<sub>2</sub> ∥ Ox</span></td><td>все профильные проекции → на <span class="m">Σ<sub>3</sub></span></td><td>—</td></tr>
+        <tr class="grp"><td colspan="5">Уровня</td></tr>
+        <tr><td style="--c:var(--c-H)"><i></i>Горизонтальная</td><td><span class="m">∥ Π<sub>1</sub></span></td><td><span class="m">Δ<sub>2</sub> ∥ Ox</span>, <span class="m">Δ<sub>3</sub> ∥ Oy</span></td><td>фронтальные → на <span class="m">Δ<sub>2</sub></span>, профильные → на <span class="m">Δ<sub>3</sub></span></td><td>на <span class="m">Π<sub>1</sub></span></td></tr>
+        <tr><td style="--c:var(--c-V)"><i></i>Фронтальная</td><td><span class="m">∥ Π<sub>2</sub></span></td><td><span class="m">Φ<sub>1</sub> ∥ Ox</span>, <span class="m">Φ<sub>3</sub> ∥ Oz</span></td><td>горизонтальные → на <span class="m">Φ<sub>1</sub></span>, профильные → на <span class="m">Φ<sub>3</sub></span></td><td>на <span class="m">Π<sub>2</sub></span></td></tr>
+        <tr><td style="--c:var(--c-W)"><i></i>Профильная</td><td><span class="m">∥ Π<sub>3</sub></span></td><td><span class="m">P<sub>2</sub> ∥ Oz</span>, <span class="m">P<sub>1</sub> ∥ Oy</span></td><td>фронтальные → на <span class="m">P<sub>2</sub></span>, горизонтальные → на <span class="m">P<sub>1</sub></span></td><td>на <span class="m">Π<sub>3</sub></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2" style="margin-top:22px">
+    <div class="note tip rv" data-i="🗝️" style="margin:0"><b class="h">Как не перепутать названия</b>Первое слово в названии — это плоскость проекций, с которой плоскость «связана»: <b>горизонтально</b>-проецирующая <span class="m">⊥ Π<sub>1</sub></span> (на <span class="m">Π<sub>1</sub></span> видна линией), <b>горизонтальная</b> уровня <span class="m">∥ Π<sub>1</sub></span> (на <span class="m">Π<sub>1</sub></span> видна в н.в.).</div>
+    <div class="note ok rv" data-i="📐" style="margin:0"><b class="h">Углы наклона</b><span class="m">α</span> — угол с <span class="m">Π<sub>1</sub></span>, <span class="m">β</span> — с <span class="m">Π<sub>2</sub></span>, <span class="m">γ</span> — с <span class="m">Π<sub>3</sub></span>. У проецирующей плоскости они видны без искажения между её наклонным следом и осями.</div>
+  </div>
+</section>
+
+<!-- ============ 8. QUIZ ============ -->
+<section id="quiz">
+  <div class="sh rv"><div class="no">08</div><div><h2>Самопроверка</h2><p>Ответь в голове, затем нажми на карточку, чтобы перевернуть её.</p></div></div>
+  <div class="quiz">
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 1</em>Назови все шесть способов задания плоскости.<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>3 точки не на одной прямой; прямая и точка вне её; две параллельные прямые; две пересекающиеся прямые; плоская фигура; следы.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 2</em>Что такое след плоскости?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>Линия пересечения плоскости с одной из плоскостей проекций.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 3</em>Что называют точкой схода следов?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>Точку пересечения двух следов плоскости на оси проекций.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 4</em>Сколько следов в общем случае имеет плоскость в системе двух плоскостей проекций?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>Два: горизонтальный и фронтальный.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 5</em>Как по эпюру узнать плоскость общего положения?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>Её следы не параллельны и не перпендикулярны ни одной оси; фигуры в ней проецируются с искажением.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 6</em>Где лежат горизонтальные проекции всех точек горизонтально-проецирующей плоскости?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>На её горизонтальном следе <span class="m">Σ<sub>1</sub></span>.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 7</em>Как расположены следы профильно-проецирующей плоскости?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em><span class="m">Σ<sub>1</sub></span> и <span class="m">Σ<sub>2</sub></span> ∥ <span class="m">Ox</span>, а <span class="m">Σ<sub>3</sub></span> наклонён к <span class="m">Oy</span> и <span class="m">Oz</span>.</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 8</em>В какой плоскости треугольник проецируется на <span class="m">Π<sub>2</sub></span> в натуральную величину?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>Во фронтальной плоскости уровня (<span class="m">∥ Π<sub>2</sub></span>).</div></div></button>
+    <button class="q rv"><div class="qi"><div class="qf"><em>Вопрос 9</em>Чем проецирующая плоскость отличается от плоскости уровня?<small>нажми, чтобы узнать</small></div><div class="qf qb"><em>Ответ</em>Проецирующая <span class="m">⊥</span> одной плоскости проекций, плоскость уровня <span class="m">∥</span> одной (и значит <span class="m">⊥</span> двум другим).</div></div></button>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <b>Лекция №3 · Плоскость</b> — интерактивный конспект по начертательной геометрии.<br>
+  3D-чертежи: three.js. Все чертежи можно вращать и разворачивать в эпюр.
+</footer>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+
+/* ---------- palette (shared by WebGL materials and CSS labels) ---------- */
+const PAL = {
+  dark:  { axis:'#eef0ff', grid:'#9aa2e0', H:'#38bdf8', V:'#a78bfa', W:'#34d399', pink:'#ff4fa3', cyan:'#22d3ee', lime:'#a3e635',
+           amber:'#fbbf24', orange:'#ff8a3d', violet:'#c084fc', red:'#ff5c7a', link:'#aab2e8' },
+  light: { axis:'#1e1b4b', grid:'#6b72b8', H:'#0284c7', V:'#7c3aed', W:'#059669', pink:'#db2777', cyan:'#0e7490', lime:'#4d7c0f',
+           amber:'#b45309', orange:'#ea580c', violet:'#9333ea', red:'#e11d48', link:'#5b6190' },
+};
+const root = document.documentElement;
+let theme = root.dataset.theme === 'light' ? 'light' : 'dark';
+const applyVars = () => { for (const [k, v] of Object.entries(PAL[theme])) root.style.setProperty('--c-' + k, v); };
+applyVars();
+
+/* ---------- math helpers (descriptive-geometry coords: x left, y to viewer, z up) ---------- */
+const L = 10;
+const V3 = p => new THREE.Vector3(-p[0], p[2], p[1]);
+const PR = { H: p => [p[0], p[1], 0], V: p => [p[0], 0, p[2]], W: p => [0, p[1], p[2]] };
+const IDX = { H: 1, V: 2, W: 3 };
+const sub = (n, i) => `${n}<sub>${i}</sub>`;
+const vadd = (a, b) => a.map((v, i) => v + b[i]);
+const vsub = (a, b) => a.map((v, i) => v - b[i]);
+const vsc = (a, s) => a.map(v => v * s);
+const vdot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const vlen = a => Math.hypot(a[0], a[1], a[2]);
+const vnorm = a => vsc(a, 1 / vlen(a));
+const vlerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+const cen = pts => vsc(pts.reduce(vadd, [0, 0, 0]), 1 / pts.length);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const smooth = x => x * x * (3 - 2 * x);
+const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const uniq = arr => { const o = []; for (const p of arr) if (!o.some(q => vlen(vsub(p, q)) < 1e-5)) o.push(p); return o; };
+const by3 = (a, b, c) => { const n = vcross(vsub(b, a), vsub(c, a)); return [n, vdot(n, a)]; };
+const onP = (n, d, x, y) => [x, y, (d - n[0] * x - n[1] * y) / n[2]];
+
+// Convex polygon = plane n·p = d clipped to the first-octant box [0, L]^3.
+function clipBox(n, d) {
+  const c = [], pts = [], E = 1e-7;
+  for (const x of [0, L]) for (const y of [0, L]) for (const z of [0, L]) c.push([x, y, z]);
+  for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) {
+    const a = c[i], b = c[j];
+    if ((a[0] !== b[0]) + (a[1] !== b[1]) + (a[2] !== b[2]) !== 1) continue;
+    const fa = vdot(n, a) - d, fb = vdot(n, b) - d;
+    if (Math.abs(fa) < E) pts.push(a);
+    if (Math.abs(fb) < E) pts.push(b);
+    if (fa * fb < 0 && Math.abs(fa) > E && Math.abs(fb) > E) pts.push(vlerp(a, b, fa / (fa - fb)));
+  }
+  const u = uniq(pts);
+  if (u.length < 3) return u;
+  const m = cen(u), e1 = vnorm(vsub(u[0], m)), e2 = vcross(vnorm(n), e1);
+  const ang = p => { const r = vsub(p, m); return Math.atan2(vdot(r, e2), vdot(r, e1)); };
+  return u.sort((p, q) => ang(p) - ang(q));
+}
+
+/* ---------- shared geometry ---------- */
+const SPH = new THREE.SphereGeometry(1, 24, 16);
+const CONE = new THREE.ConeGeometry(.2, .66, 20); CONE.translate(0, -.33, 0);
+const GLOW = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.25, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+const coarse = matchMedia('(pointer:coarse)').matches;
+const mk = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; };
+
+/* =====================================================================
+   Diagram: one interactive 3D drawing.
+   Groups: R – static (axes), S – objects in space (fade out in epure),
+   H/V/W – content lying on Π1/Π2/Π3 (H and W rotate when unfolding),
+   E – epure-only helpers (fade in). Label role U = visible only once unfolding starts.
+   ===================================================================== */
+class Diagram {
+  constructor(host, def) {
+    Object.assign(this, { host, def, P: def.planes || 'HVW', mats: [], lineMats: [], lbls: [], t: 0, labelsOn: true, renderer: null, anim: null });
+    this.tri = this.P.length === 3;
+    this.scene = new THREE.Scene();
+    this.G = {};
+    for (const k of 'RSHVWE') { this.G[k] = new THREE.Group(); this.scene.add(this.G[k]); }
+    this.camera = new THREE.PerspectiveCamera(34, Math.max(.3, host.clientWidth / Math.max(1, host.clientHeight)), .1, 400);
+    this.lr = new CSS2DRenderer();
+    this.lr.domElement.className = 'lbl-layer';
+    host.appendChild(this.lr.domElement);
+
+    const c = this.controls = new OrbitControls(this.camera, host);
+    Object.assign(c, { enableDamping: true, dampingFactor: .09, rotateSpeed: .8, zoomSpeed: .9, minDistance: 8, maxDistance: 90 });
+    this.auto = !!host.dataset.auto;
+    c.addEventListener('start', () => { this.anim = null; this.auto = false; host.classList.add('touched'); });
+    // Let the page scroll: zoom only with Ctrl/⌘ + wheel (trackpad pinch also sets ctrlKey).
+    host.addEventListener('wheel', e => {
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); return; }
+      e.stopImmediatePropagation();
+      this.toast('Ctrl + колесо — масштаб');
+    }, { capture: true, passive: false });
+
+    this.frame();
+    def.build(this);
+    this.v3 = this.view3d();
+    this.camera.position.copy(this.v3.pos);
+    c.target.copy(this.v3.tgt);
+    c.update();
+    this.ui();
+    this.setT(0);
+    new ResizeObserver(() => this.resize()).observe(host);
+    this.resize();
+  }
+
+  /* --- materials & primitives --- */
+  reg(m, key, g, role) {
+    m.userData = { key, base: m.opacity, role: role || g };
+    m.color.set(PAL[theme][key]);
+    this.mats.push(m);
+    return m;
+  }
+  line(g, pts, key, o = {}) {
+    const m = new LineMaterial({ color: 0xffffff, linewidth: o.w ?? 2.4, transparent: true, opacity: o.op ?? 1, dashed: !!o.dash, dashSize: .26, gapSize: .2, worldUnits: false });
+    const off = o.off ?? (g === 'H' || g === 'V' || g === 'W' ? 1 : 0);
+    if (off) Object.assign(m, { polygonOffset: true, polygonOffsetFactor: -off, polygonOffsetUnits: -off * 4 });
+    this.lineMats.push(m);
+    this.reg(m, key, g, o.role);
+    const geo = new LineGeometry();
+    geo.setPositions(pts.flatMap(p => V3(p).toArray()));
+    const ln = new Line2(geo, m);
+    if (o.dash) ln.computeLineDistances();
+    ln.renderOrder = 2;
+    this.G[g].add(ln);
+    return ln;
+  }
+  fill(g, pts, key, op = .3, role) {
+    const area = vlen(pts.slice(2).reduce((s, p, i) => vadd(s, vcross(vsub(pts[i + 1], pts[0]), vsub(p, pts[0]))), [0, 0, 0]));
+    if (area < 1e-4) return;
+    const pos = [];
+    for (let i = 1; i < pts.length - 1; i++) pos.push(...V3(pts[0]).toArray(), ...V3(pts[i]).toArray(), ...V3(pts[i + 1]).toArray());
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const m = this.reg(new THREE.MeshBasicMaterial({ transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }), key, g, role);
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.renderOrder = 5; // after lines, so lines behind a surface get tinted by it
+    this.G[g].add(mesh);
+  }
+  grid(g, q) {
+    const a = q[0], u = vsub(q[1], a), v = vsub(q[3], a), pos = [];
+    for (let i = 1; i < L; i++) {
+      const s = i / L, p1 = vadd(a, vsc(u, s)), p3 = vadd(a, vsc(v, s));
+      pos.push(...V3(p1).toArray(), ...V3(vadd(p1, v)).toArray(), ...V3(p3).toArray(), ...V3(vadd(p3, u)).toArray());
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    this.G[g].add(new THREE.LineSegments(geo, this.reg(new THREE.LineBasicMaterial({ transparent: true, opacity: .16, depthWrite: false }), 'grid', g)));
+  }
+  dot(g, p, key, r = .12, glow = false) {
+    const m = this.reg(new THREE.MeshBasicMaterial({ transparent: true }), key, g);
+    const s = new THREE.Mesh(SPH, m);
+    s.scale.setScalar(r); s.position.copy(V3(p)); s.renderOrder = 3;
+    this.G[g].add(s);
+    if (glow) {
+      const sm = this.reg(new THREE.SpriteMaterial({ map: GLOW, transparent: true, opacity: .55, depthWrite: false }), key, g);
+      const sp = new THREE.Sprite(sm);
+      sp.scale.setScalar(r * 7); sp.position.copy(V3(p)); sp.renderOrder = 4;
+      this.G[g].add(sp);
+    }
+  }
+  label(g, p, html, key = 'axis', o = {}) {
+    const el = mk('div', 'lbl ' + (o.cls || ''));
+    const s = mk('span', '', html);
+    s.style.color = `var(--c-${key})`;
+    s.style.transform = `translate(${o.dx ?? 11}px, ${o.dy ?? -11}px)`;
+    el.appendChild(s);
+    const obj = new CSS2DObject(el);
+    obj.position.copy(V3(p));
+    this.G[g].add(obj);
+    this.lbls.push({ s, role: o.role || g });
+    return obj;
+  }
+  arrow(g, a, b, name, role) {
+    this.line(g, [a, b], 'axis', { w: 2, op: .9, off: 0 });
+    const cone = new THREE.Mesh(CONE, this.reg(new THREE.MeshBasicMaterial({ transparent: true }), 'axis', g));
+    cone.position.copy(V3(b));
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), V3(vsub(b, a)).normalize());
+    this.G[g].add(cone);
+    this.label(g, vadd(b, vsc(vnorm(vsub(b, a)), .8)), name, 'axis', { cls: 'ax', dx: 0, dy: 0, role });
+  }
+
+  /* --- the fixed frame: projection planes and axes --- */
+  frame() {
+    const Q = { H: [[0, 0, 0], [L, 0, 0], [L, L, 0], [0, L, 0]], V: [[0, 0, 0], [L, 0, 0], [L, 0, L], [0, 0, L]], W: [[0, 0, 0], [0, L, 0], [0, L, L], [0, 0, L]] };
+    const PL = { H: [L - .9, L - .7, 0], V: [L - .9, 0, L - .8], W: [0, L - .8, L - .8] };
+    for (const k of this.P) {
+      this.fill(k, Q[k], k, .09);
+      this.line(k, [...Q[k], Q[k][0]], k, { w: 1.4, op: .6, off: 0 });
+      this.grid(k, Q[k]);
+      this.label(k, PL[k], sub('Π', IDX[k]), k, { cls: 'pl', dx: 0, dy: 0 });
+    }
+    const A = L + 1.9;
+    this.arrow('R', [this.tri ? 0 : -1.6, 0, 0], [A, 0, 0], 'x');
+    if (this.tri) {
+      this.arrow('R', [0, 0, 0], [0, 0, A], 'z');
+      this.arrow('W', [0, 0, 0], [0, A, 0], 'y');
+      this.arrow('H', [0, 0, 0], [0, A, 0], 'y′', 'U');
+    }
+    this.label('R', [0, 0, 0], 'O', 'axis', { cls: 'ax sm', dx: 12, dy: 14 });
+  }
+
+  /* --- high-level objects --- */
+  // Point with its projections, projectors and linkage lines.
+  point(name, p, key = 'pink', o = {}) {
+    this.dot('S', p, key, .17, true);
+    this.label('S', p, name, key, { cls: 'big', ...o.lab });
+    const pr = {};
+    for (const k of this.P) {
+      const q = pr[k] = PR[k](p);
+      this.dot(k, q, key, .11);
+      this.label(k, q, sub(name, IDX[k]), key, o['lab' + k]);
+      if (vlen(vsub(p, q)) > 1e-6) this.line('S', [p, q], key, { w: 1.3, dash: true, op: .7 });
+    }
+    if (o.links !== false) {
+      const lk = (g, a, b) => vlen(vsub(a, b)) > 1e-6 && this.line(g, [a, b], 'link', { w: 1.2, dash: true, op: .85 });
+      if (pr.H && pr.V) { const ax = [p[0], 0, 0]; lk('H', pr.H, ax); lk('V', pr.V, ax); }
+      if (pr.V && pr.W) { const az = [0, 0, p[2]]; lk('V', pr.V, az); lk('W', pr.W, az); }
+      if (pr.H && pr.W) { const ay = [0, p[1], 0]; lk('H', pr.H, ay); lk('W', pr.W, ay); this.arcE(p[1]); }
+      if (o.axisLabels) {
+        const sm = { cls: 'sm', dx: 0, dy: 16 };
+        this.dot('R', [p[0], 0, 0], 'link', .07); this.label('R', [p[0], 0, 0], sub(name, 'x'), 'link', sm);
+        if (this.tri) {
+          this.dot('R', [0, 0, p[2]], 'link', .07); this.label('R', [0, 0, p[2]], sub(name, 'z'), 'link', { cls: 'sm', dx: 16, dy: 0 });
+          this.dot('W', [0, p[1], 0], 'link', .07); this.label('W', [0, p[1], 0], sub(name, 'y'), 'link', { cls: 'sm', dx: 16, dy: 10 });
+          this.dot('H', [0, p[1], 0], 'link', .07); this.label('H', [0, p[1], 0], sub(name, 'y'), 'link', { cls: 'sm', dx: 18, dy: 0, role: 'U' });
+        }
+      }
+    }
+    return pr;
+  }
+  // Quarter arc joining the two copies of the y-coordinate on the epure.
+  arcE(r) {
+    if (r < 1e-6) return;
+    const pts = [];
+    for (let i = 0; i <= 32; i++) { const a = i / 32 * Math.PI / 2; pts.push([-r * Math.sin(a), 0, -r * Math.cos(a)]); }
+    this.line('E', pts, 'link', { w: 1.2, dash: true, op: .85 });
+  }
+  // Segment/polyline with projections; optional name at a fraction of its length.
+  seg(pts, key, o = {}) {
+    this.line('S', pts, key, { w: o.w ?? 3.4 });
+    for (const k of this.P) this.line(k, pts.map(PR[k]), key, { w: 2.6, off: 3 });
+    if (o.name) {
+      const p = vlerp(pts[0], pts[pts.length - 1], o.at ?? .15);
+      this.label('S', p, o.name, key, { cls: 'big', ...o.lab });
+      for (const k of this.P) this.label(k, PR[k](p), sub(o.name, IDX[k]), key, o['lab' + k]);
+    }
+  }
+  tri3(pts, key, o = {}) {
+    this.fill('S', pts, key, o.op ?? .38);
+    this.line('S', [...pts, pts[0]], key, { w: 3.2 });
+    for (const k of this.P) {
+      const q = pts.map(PR[k]);
+      this.fill(k, q, key, .3);
+      this.line(k, [...q, q[0]], key, { w: 2.6, off: 3 });
+    }
+    if (o.names) o.names.forEach((n, i) => this.point(n, pts[i], key, { links: o.links, ...(o.lab?.[i] || {}) }));
+  }
+  plane(n, d, key, o = {}) {
+    const poly = clipBox(n, d);
+    this.fill('S', poly, key, o.op ?? .2);
+    this.line('S', [...poly, poly[0]], key, { w: 1.5, op: o.edgeOp ?? .75 });
+    if (o.label) this.label('S', o.labelAt || cen(poly), o.label, key, { cls: 'big', dx: 0, dy: 0 });
+    const tr = {};
+    if (o.traces) for (const k of this.P) {
+      const ax = { H: 2, V: 1, W: 0 }[k];
+      const pts = uniq(poly.filter(p => Math.abs(p[ax]) < 1e-6));
+      if (pts.length < 2) continue;
+      let [a, b] = pts;
+      const sc = { H: p => [p[1], p[0]], V: p => [p[2], p[0]], W: p => [p[2], p[1]] }[k];
+      const sa = sc(a), sb = sc(b);
+      if (sb[0] < sa[0] - 1e-6 || (Math.abs(sb[0] - sa[0]) < 1e-6 && sb[1] < sa[1])) [a, b] = [b, a];
+      tr[k] = [a, b];
+      this.line(k, [a, b], key, { w: 3.8, off: 2 });
+      const nm = o.tn?.[k] ?? sub(o.name, IDX[k]);
+      if (nm) this.label(k, vlerp(a, b, o.tl?.[k] ?? .8), nm, key, { cls: 'big', ...(o.tlab?.[k] || {}) });
+    }
+    return { poly, tr };
+  }
+  // Angle arc in the plane spanned by u, v at vertex c (DG coords).
+  angle(g, c, u, v, r, key, html) {
+    u = vnorm(u); v = vnorm(v);
+    const th = Math.acos(clamp(vdot(u, v), -1, 1)), pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const s = i / 24, w = vadd(vsc(u, Math.sin((1 - s) * th)), vsc(v, Math.sin(s * th)));
+      pts.push(vadd(c, vsc(w, r / Math.sin(th))));
+    }
+    this.line(g, pts, key, { w: 2.4, off: 4 });
+    this.label(g, vadd(c, vsc(vnorm(vadd(u, v)), r * 1.55)), html, key, { cls: 'big', dx: 0, dy: 0 });
+  }
+
+  /* --- camera views --- */
+  fit(halfW, halfH) {
+    const vh = THREE.MathUtils.degToRad(this.camera.fov / 2), hh = Math.atan(Math.tan(vh) * this.camera.aspect);
+    return Math.max(halfH / Math.tan(vh), halfW / Math.tan(hh));
+  }
+  view3d() {
+    const tgt = V3([L * .48, L * .45, L * .36]);
+    const dir = new THREE.Vector3(...(this.def.view || (this.tri ? [-.12, .48, 1] : [.35, .42, 1]))).normalize();
+    return { tgt, pos: tgt.clone().add(dir.multiplyScalar(this.tri ? this.fit(10.8, 10.4) : this.fit(10.2, 9.4))), t: 0 };
+  }
+  viewEpure() {
+    // shifted down a little so the drawing clears the toolbar at the bottom
+    const tgt = this.tri ? new THREE.Vector3(0, -1.5, 0) : new THREE.Vector3(-5.1, -.9, 0);
+    const dist = this.tri ? this.fit(L + 2.6, L + 3.6) : this.fit(7.4, L + 2.4);
+    return { tgt, pos: tgt.clone().add(new THREE.Vector3(0, 0, dist)), t: 1 };
+  }
+  go(mode) {
+    const to = mode === 'epure' ? this.viewEpure() : this.view3d();
+    this.auto = false;
+    this.anim = { t0: performance.now(), dur: 1500, fp: this.camera.position.clone(), ft: this.controls.target.clone(), fT: this.t, to };
+    this.host.classList.add('touched');
+  }
+
+  /* --- unfolding --- */
+  setT(t) {
+    this.t = t;
+    this.dirty = true;
+    this.G.H.rotation.x = t * Math.PI / 2;
+    this.G.W.rotation.y = t * Math.PI / 2;
+    const fS = 1 - smooth(clamp(t / .55)), fE = smooth(clamp((t - .72) / .28)), fU = clamp(t * 6);
+    const f = r => r === 'S' ? fS : r === 'E' ? fE : r === 'U' ? fU : 1;
+    for (const m of this.mats) m.opacity = m.userData.base * f(m.userData.role);
+    this.G.S.visible = fS > .005;
+    this.G.E.visible = fE > .005;
+    for (const l of this.lbls) l.s.style.opacity = f(l.role);
+    if (this.slider) this.slider.value = Math.round(t * 1000);
+    if (this.modeBtn) this.modeBtn.textContent = t < .5 ? 'Развернуть в эпюр' : 'Собрать в 3D';
+  }
+
+  /* --- UI overlay --- */
+  ui() {
+    const h = this.host;
+    if (h.dataset.badge) h.appendChild(mk('div', 'vbadge', h.dataset.badge));
+    h.appendChild(mk('div', 'vhint', coarse ? 'Веди пальцем — вращать<br>✋ — режим свободного вращения' : 'Тяни — вращать · ПКМ — сдвиг<br>Ctrl + колесо — масштаб'));
+    this.toastEl = h.appendChild(mk('div', 'vtoast'));
+    const bar = h.appendChild(mk('div', 'vbar', `
+      <button class="vb mode" data-a="mode" title="Развернуть плоскости проекций в комплексный чертёж"><span>Развернуть в эпюр</span></button>
+      <label class="vslider" title="Развёртка плоскостей проекций"><b>3D</b><input type="range" min="0" max="1000" value="0" aria-label="Развёртка в эпюр"><b>КЧ</b></label>
+      <button class="vb ico" data-a="reset" title="Сбросить вид">⟲</button>
+      <button class="vb ico" data-a="labels" title="Подписи вкл/выкл">Aa</button>
+      <button class="vb ico touch" data-a="touch" title="Свободное вращение пальцем (страница не прокручивается)">✋</button>
+      <button class="vb ico" data-a="fs" title="На весь экран">⤢</button>`));
+    ['pointerdown', 'touchstart'].forEach(ev => bar.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
+    this.slider = bar.querySelector('input');
+    this.modeBtn = bar.querySelector('[data-a=mode] span');
+    this.slider.addEventListener('input', () => { this.anim = null; this.setT(this.slider.value / 1000); h.classList.add('touched'); });
+    if (!h.requestFullscreen) bar.querySelector('[data-a=fs]').remove();
+    bar.addEventListener('click', e => {
+      const btn = e.target.closest('[data-a]');
+      if (!btn) return;
+      const a = btn.dataset.a;
+      if (a === 'mode') this.go(this.t < .5 ? 'epure' : '3d');
+      if (a === 'reset') this.go(this.t < .5 ? '3d' : 'epure');
+      if (a === 'labels') { this.labelsOn = !this.labelsOn; this.lr.domElement.style.opacity = this.labelsOn ? 1 : 0; btn.classList.toggle('off', !this.labelsOn); }
+      if (a === 'touch') { const free = h.style.touchAction !== 'none'; h.style.touchAction = free ? 'none' : 'pan-y'; btn.classList.toggle('on', free); this.toast(free ? 'Свободное вращение' : 'Вертикальный свайп — прокрутка'); }
+      if (a === 'fs') document.fullscreenElement ? document.exitFullscreen() : h.requestFullscreen();
+    });
+    // On touch screens keep vertical swipes for page scrolling by default.
+    if (coarse) h.style.touchAction = 'pan-y';
+  }
+  toast(msg) {
+    const now = performance.now();
+    if (this._tt && now - this._tt < 1500 && this.toastEl.textContent === msg) return;
+    this._tt = now;
+    this.toastEl.textContent = msg;
+    this.toastEl.classList.add('on');
+    clearTimeout(this._to);
+    this._to = setTimeout(() => this.toastEl.classList.remove('on'), 1300);
+  }
+
+  /* --- lifecycle --- */
+  activate() {
+    if (this.renderer) return;
+    try {
+      const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      r.setPixelRatio(Math.min(devicePixelRatio, 2));
+      r.setClearColor(0x000000, 0);
+      this.host.prepend(r.domElement);
+      this.resize();
+    } catch (e) { this.renderer = null; this.host.classList.add('nogl'); }
+  }
+  deactivate() {
+    if (!this.renderer) return;
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.renderer.domElement.remove();
+    this.renderer = null;
+  }
+  resize() {
+    const w = this.host.clientWidth, h = this.host.clientHeight;
+    if (!w || !h) return;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer?.setSize(w, h);
+    this.lr.setSize(w, h);
+    for (const m of this.lineMats) m.resolution.set(w, h);
+    this.dirty = true;
+  }
+  recolor() { for (const m of this.mats) m.color.set(PAL[theme][m.userData.key]); this.dirty = true; }
+  render(now) {
+    const a = this.anim;
+    if (a) {
+      const k = ease(clamp((now - a.t0) / a.dur));
+      this.camera.position.lerpVectors(a.fp, a.to.pos, k);
+      this.controls.target.lerpVectors(a.ft, a.to.tgt, k);
+      this.setT(a.fT + (a.to.t - a.fT) * k);
+      if (k >= 1) this.anim = null;
+    }
+    if (this.auto && !a) {
+      // gentle idle swing around the default view until the user interacts
+      const off = this.v3.pos.clone().sub(this.v3.tgt).applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(now / 2600) * .55);
+      this.camera.position.copy(this.v3.tgt).add(off);
+    }
+    // controls.update() reports camera changes; skip idle frames to save battery
+    const moved = this.controls.update();
+    if (!moved && !this.dirty && !a && !this.auto) return;
+    this.dirty = false;
+    this.renderer.render(this.scene, this.camera);
+    this.lr.render(this.scene, this.camera);
+  }
+}
+
+/* =====================================================================
+   Scenes (coordinates: [x, y, z] in the first octant, box 0…10)
+   ===================================================================== */
+const SCENES = {
+  intro: { planes: 'HVW', build(d) {
+    d.point('A', [6, 4, 5.5], 'pink', { axisLabels: true });
+  } },
+
+  threePoints: { planes: 'HV', build(d) {
+    const A = [8.5, 2.5, 6.5], B = [5.2, 6.2, 8.2], C = [2, 3.8, 3];
+    const [n, k] = by3(A, B, C);
+    d.plane(n, k, 'orange', { op: .12, edgeOp: .35, label: 'Ψ', labelAt: vadd(cen([A, B, C]), [0, 0, -1.4]) });
+    d.point('A', A, 'pink'); d.point('B', B, 'cyan'); d.point('C', C, 'lime');
+    d.line('S', [A, B, C, A], 'orange', { w: 1.2, dash: true, op: .7 });
+  } },
+
+  linePoint: { planes: 'HV', build(d) {
+    const l0 = [9.2, 2, 2.6], l1 = [1.6, 5.2, 6.2], A = [5.2, 7.4, 8.4];
+    const [n, k] = by3(l0, l1, A);
+    d.plane(n, k, 'orange', { op: .12, edgeOp: .35, label: 'Σ', labelAt: [3.6, 6.2, 5.2] });
+    d.seg([l0, l1], 'cyan', { name: 'l', at: .08 });
+    d.point('A', A, 'pink');
+  } },
+
+  parallel: { planes: 'HV', build(d) {
+    const dir = [-6.6, 1.4, 2];
+    const a0 = [9, 1.8, 6.4], b0 = [9, 5.6, 2.6];
+    const [n, k] = by3(a0, vadd(a0, dir), b0);
+    d.plane(n, k, 'orange', { op: .12, edgeOp: .35, label: 'Λ', labelAt: vadd(vlerp(a0, b0, .5), vsc(dir, .55)) });
+    d.seg([a0, vadd(a0, dir)], 'lime', { name: 'a', at: .06 });
+    d.seg([b0, vadd(b0, dir)], 'pink', { name: 'b', at: .06 });
+  } },
+
+  intersect: { planes: 'HV', build(d) {
+    const K = [5.5, 4.2, 5], dc = [1, .45, .75], dd = [1, -.55, -.45], s = 3.3;
+    const [n, k] = by3(K, vadd(K, dc), vadd(K, dd));
+    d.plane(n, k, 'orange', { op: .12, edgeOp: .35 });
+    d.seg([vadd(K, vsc(dc, s)), vadd(K, vsc(dc, -s))], 'amber', { name: 'c', at: .02 });
+    d.seg([vadd(K, vsc(dd, s)), vadd(K, vsc(dd, -s))], 'cyan', { name: 'd', at: .02 });
+    d.point('K', K, 'pink');
+  } },
+
+  figure: { planes: 'HV', build(d) {
+    const A = [9, 6.6, 3.6], B = [5, 2, 8.6], C = [2.6, 4.8, 4.6];
+    const [n, k] = by3(A, B, C);
+    d.plane(n, k, 'orange', { op: .08, edgeOp: .3 });
+    d.tri3([A, B, C], 'violet', { names: ['A', 'B', 'C'] });
+  } },
+
+  tracesWay: { planes: 'HV', build(d) {
+    d.plane([1 / 8.5, 1 / 7.5, 1 / 7], 1, 'orange', { op: .22, traces: true, name: 'Θ', label: 'Θ', labelAt: [2.6, 2.4, 2.6] });
+    d.dot('R', [8.5, 0, 0], 'orange', .13, true);
+    d.label('R', [8.5, 0, 0], sub('Θ', 'x'), 'orange', { cls: 'big', dx: 4, dy: 16 });
+  } },
+
+  traces: { planes: 'HV', build(d) {
+    const n = [1 / 9, 1 / 8, 1 / 7];
+    d.plane(n, 1, 'orange', { op: .2, traces: true, name: 'Γ',
+      tn: { H: 'Γ<sub>1</sub> ≡ h<sub>0</sub>', V: 'Γ<sub>2</sub> ≡ f<sub>0</sub>' }, tl: { H: .72, V: .72 } });
+    d.dot('R', [9, 0, 0], 'orange', .13, true);
+    d.label('R', [9, 0, 0], sub('Γ', 'x'), 'orange', { cls: 'big', dx: 4, dy: 16 });
+    const z = 3, y = 3;
+    d.seg([[9 * (1 - z / 7), 0, z], [0, 8 * (1 - z / 7), z]], 'lime', { name: 'h', at: .12 });
+    d.seg([[9 * (1 - y / 8), y, 0], [0, y, 7 * (1 - y / 8)]], 'cyan', { name: 'f', at: .88 });
+  } },
+
+  hero: { planes: 'HVW', build(d) {
+    const n = [1 / 9.5, 1 / 9, 1 / 9.5];
+    d.plane(n, 1, 'orange', { op: .24, traces: true, name: 'Σ', label: 'Σ', labelAt: [3.2, 3, 3.2], tl: { H: .5, V: .5, W: .5 } });
+    d.point('A', [6.5, 5, 7], 'pink');
+  } },
+
+  general: { planes: 'HVW', build(d) {
+    const a = 9.5, b = 9, c = 9.5, n = [1 / a, 1 / b, 1 / c];
+    d.plane(n, 1, 'orange', { op: .2, traces: true, name: 'Σ', tl: { H: .55, V: .55, W: .55 } });
+    d.dot('R', [a, 0, 0], 'orange', .13); d.label('R', [a, 0, 0], sub('Σ', 'x'), 'orange', { dx: 4, dy: 16 });
+    d.dot('R', [0, 0, c], 'orange', .13); d.label('R', [0, 0, c], sub('Σ', 'z'), 'orange', { dx: 20, dy: 4 });
+    d.dot('W', [0, b, 0], 'orange', .13); d.label('W', [0, b, 0], sub('Σ', 'y'), 'orange', { dx: 6, dy: 16 });
+    d.dot('H', [0, b, 0], 'orange', .13); d.label('H', [0, b, 0], sub('Σ', 'y'), 'orange', { dx: 20, dy: 2, role: 'U' });
+    d.tri3([onP(n, 1, 5, 1), onP(n, 1, 1.5, 2), onP(n, 1, 2.5, 5)], 'cyan', { names: ['A', 'B', 'C'], links: false });
+  } },
+
+  hproj: { planes: 'HVW', build(d) {
+    const n = [7, 8, 0], k = 56;
+    d.plane(n, k, 'orange', { op: .2, traces: true, name: 'Σ', label: 'Σ', labelAt: [4.6, 3, 8.2], tl: { H: .42 } });
+    const A = [6, 1.75, 6.5], B = [2, 5.25, 2.5];
+    d.seg([A, B], 'pink', { w: 3.6 });
+    d.point('A', A, 'pink'); d.point('B', B, 'cyan');
+    d.angle('H', [8, 0, 0], [-1, 0, 0], [-8, 7, 0], 1.8, 'amber', 'β');
+    d.angle('H', [0, 7, 0], [0, -1, 0], [8, -7, 0], 1.8, 'lime', 'γ');
+  } },
+
+  fproj: { planes: 'HVW', view: [-.8, .45, .85], build(d) {
+    const n = [7, 0, 8], k = 56;
+    d.plane(n, k, 'orange', { op: .2, traces: true, name: 'Σ', label: 'Σ', labelAt: [3.4, 8.6, 4.2] });
+    const z = (x, y) => onP(n, k, x, y);
+    d.tri3([z(6.6, 1.6), z(2.4, 4), z(5, 8)], 'cyan', { names: ['A', 'B', 'C'] });
+    d.angle('V', [8, 0, 0], [-1, 0, 0], [-8, 0, 7], 1.8, 'amber', 'α');
+    d.angle('V', [0, 0, 7], [0, 0, -1], [8, 0, -7], 1.8, 'lime', 'γ');
+  } },
+
+  pproj: { planes: 'HVW', view: [-.5, .45, 1], build(d) {
+    const n = [0, 6.5, 7], k = 45.5;
+    d.plane(n, k, 'orange', { op: .2, traces: true, name: 'Σ', label: 'Σ', labelAt: [5, 3.4, 3.6] });
+    const A = [7.5, 2, (k - 13) / 7], B = [2.5, 5, (k - 32.5) / 7];
+    d.seg([A, B], 'pink', { w: 3.6 });
+    d.point('A', A, 'pink'); d.point('B', B, 'cyan');
+    d.angle('W', [0, 7, 0], [0, -1, 0], [0, -7, 6.5], 1.8, 'amber', 'α');
+    d.angle('W', [0, 0, 6.5], [0, 0, -1], [0, 7, -6.5], 1.8, 'lime', 'β');
+  } },
+
+  hlevel: { planes: 'HVW', build(d) {
+    d.plane([0, 0, 1], 5, 'orange', { op: .18, traces: true, name: 'Δ', tl: { V: .95, W: .95 } });
+    const T = [[8.6, 2, 5], [3, 3.6, 5], [6.2, 8.2, 5]];
+    d.tri3(T, 'cyan', { names: ['A', 'B', 'C'], links: false });
+    d.label('H', PR.H(cen(T)), 'н.в.', 'amber', { cls: 'tg', dx: 0, dy: 0 });
+  } },
+
+  flevel: { planes: 'HVW', build(d) {
+    d.plane([0, 1, 0], 4, 'orange', { op: .18, traces: true, name: 'Φ', tl: { H: .95, W: .95 } });
+    const T = [[8.6, 4, 2], [5, 4, 8.6], [2, 4, 3.2]];
+    d.tri3(T, 'cyan', { names: ['A', 'B', 'C'], links: false });
+    d.label('V', PR.V(cen(T)), 'н.в.', 'amber', { cls: 'tg', dx: 0, dy: 0 });
+  } },
+
+  plevel: { planes: 'HVW', view: [-.75, .45, 1], build(d) {
+    d.plane([1, 0, 0], 5, 'orange', { op: .18, traces: true, name: 'P', tl: { H: .95, V: .95 } });
+    const T = [[5, 1.6, 2], [5, 8.2, 3.6], [5, 4, 8.6]];
+    d.tri3(T, 'cyan', { names: ['A', 'B', 'C'], links: false });
+    d.label('W', PR.W(cen(T)), 'н.в.', 'amber', { cls: 'tg', dx: 0, dy: 0 });
+  } },
+};
+
+/* ---------- boot ---------- */
+const ALL = [];
+const io = new IntersectionObserver(es => es.forEach(e => {
+  const d = e.target._d;
+  e.isIntersecting ? d.activate() : d.deactivate();
+}), { rootMargin: '250px 0px' });
+document.querySelectorAll('.viewer[data-scene]').forEach(el => {
+  const def = SCENES[el.dataset.scene];
+  if (!def) return;
+  const d = new Diagram(el, def);
+  el._d = d; ALL.push(d); io.observe(el);
+});
+(function loop(now) {
+  for (const d of ALL) if (d.renderer) d.render(now);
+  requestAnimationFrame(loop);
+})(performance.now());
+
+/* theme */
+const tbtn = document.getElementById('theme');
+const syncBtn = () => { tbtn.textContent = theme === 'dark' ? '☀️' : '🌙'; };
+syncBtn();
+tbtn.addEventListener('click', () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  root.dataset.theme = theme;
+  try { localStorage.setItem('ng-theme', theme); } catch (e) {}
+  applyVars(); syncBtn();
+  ALL.forEach(d => d.recolor());
+});
+
+/* reveal, progress, active nav */
+const rio = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); rio.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
+document.querySelectorAll('.rv').forEach(el => rio.observe(el));
+const prog = document.getElementById('progress');
+const navLinks = [...document.querySelectorAll('.links a')];
+const secs = navLinks.map(a => document.querySelector(a.getAttribute('href')));
+let curNav = -2;
+const onScroll = () => {
+  const h = root.scrollHeight - innerHeight;
+  prog.style.width = (h > 0 ? scrollY / h * 100 : 0) + '%';
+  let cur = -1;
+  secs.forEach((s, i) => { if (s && s.getBoundingClientRect().top < innerHeight * .35) cur = i; });
+  if (cur === curNav) return;
+  curNav = cur;
+  navLinks.forEach((a, i) => a.classList.toggle('on', i === cur));
+  if (cur >= 0) { const bar = navLinks[cur].parentElement, a = navLinks[cur]; bar.scrollTo({ left: a.offsetLeft - bar.offsetLeft - bar.clientWidth / 2 + a.clientWidth / 2, behavior: 'smooth' }); }
+};
+addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+
+/* quiz */
+document.querySelectorAll('.q').forEach(q => q.addEventListener('click', () => q.classList.toggle('on')));
+</script>
+</body>
+</html>
